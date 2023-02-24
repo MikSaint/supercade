@@ -1,4 +1,4 @@
-# Supercade 2022
+# Supercade
 The modern arcade cabin for everyone
 
 Todos:
