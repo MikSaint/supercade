@@ -1,8 +1,6 @@
 # Supercade
 The modern arcade cabin for everyone
 
-![SuperCade](https://github.com/MikSaint/supercade/blob/master/Supercade_Promo.png)
-
 <img width="2000" height="926" alt="image" src="https://github.com/user-attachments/assets/766626a6-eb46-4c2e-bc97-a72bb91b9787" />
 
 <img width="1650" height="1275" alt="image" src="https://github.com/user-attachments/assets/caea6345-cd00-49e7-8ca1-e7afe4c98e0d" />
