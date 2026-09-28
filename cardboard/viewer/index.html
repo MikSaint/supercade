@@ -1,0 +1,1110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<!-- VIEWER:START -->
+<title>Supercade Flat-Pack</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* One deliberate look: a workshop table under studio light, with a
+     self-healing cutting mat as the floor. Colours are explicit, so the page
+     reads the same in either host theme. */
+  :root {
+    color-scheme: light;
+    --scene: #dfe3dd;
+    --paper: #fbfcf9;
+    --paper-2: #f1f4ef;
+    --ink: #17201b;
+    --muted: #5e6c64;
+    --rule: #d5dcd6;
+    --mat: #2f6f5a;
+    --accent: #d8342a;
+    --accent-ink: #ffffff;
+    --good: #2f7d4f;
+    --warn: #b7791f;
+    --shadow: 0 1px 2px rgba(23, 32, 27, .08), 0 8px 24px rgba(23, 32, 27, .10);
+    --display: "Bungee", "Arial Black", Impact, sans-serif;
+    --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--scene);
+    color: var(--ink);
+    font: 14px/1.45 var(--body);
+    overflow: hidden;
+  }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .panel {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .panel header { padding: 16px 18px 12px; border-bottom: 1px solid var(--rule); }
+  .brand {
+    margin: 0;
+    font: 400 26px/1 var(--display);
+    letter-spacing: .02em;
+    color: var(--ink);
+  }
+  .brand span { color: var(--accent); }
+  .tag { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .scroll { overflow-y: auto; padding: 6px 18px 18px; display: grid; gap: 16px; }
+  .group { display: grid; gap: 8px; }
+  .label {
+    font: 500 11px/1 var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .seg { display: flex; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    border-radius: 7px;
+    padding: 8px 6px;
+    font: 600 13px/1 var(--body);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    border-radius: 999px;
+    padding: 6px 11px;
+    font: 500 13px/1 var(--body);
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .chip small { font: 400 11px/1 var(--mono); color: var(--muted); }
+  .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .chip[aria-pressed="true"] small { color: #b8c4bd; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid var(--paper);
+    box-shadow: 0 0 0 1px var(--rule);
+    cursor: pointer;
+    padding: 0;
+  }
+  .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+  .swatches[data-off="true"] { opacity: .35; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+  .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  .dims { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .dims div { background: var(--paper); padding: 8px 10px; }
+  .dims dt { font: 500 10px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .dims dd { margin: 3px 0 0; font: 500 15px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+  .fit { display: grid; gap: 6px; }
+  .fit p { margin: 0; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .pill { font: 500 11px/1 var(--mono); padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
+  .pill.good { background: #e3f1e8; color: var(--good); }
+  .pill.warn { background: #f8ecd6; color: var(--warn); }
+
+  .parts { list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .parts li {
+    display: grid;
+    grid-template-columns: 38px 1fr auto;
+    gap: 8px;
+    align-items: baseline;
+    padding: 7px 10px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    cursor: default;
+  }
+  .parts li:first-child { border-top: 0; }
+  .parts li:hover, .parts li.hot { background: #fff4d6; }
+  .parts b { font: 500 12px/1 var(--mono); color: var(--accent); }
+  .parts span.sz { font: 400 12px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .hint {
+    position: fixed;
+    right: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    font: 400 12px/1.4 var(--mono);
+    color: var(--muted);
+    background: rgba(251, 252, 249, .85);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .tip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.35;
+    max-width: 240px;
+    transform: translate(12px, 12px);
+    box-shadow: var(--shadow);
+  }
+  .tip b { font: 500 12px/1 var(--mono); color: #ffb3ad; margin-right: 6px; }
+  .tip .m { font-family: var(--mono); color: #b8c4bd; }
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  .tag3d {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font: 500 11px/1 var(--mono);
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 5px;
+    padding: 3px 5px;
+    white-space: nowrap;
+    transition: opacity .2s;
+  }
+  .tag3d.person { border-color: var(--mat); color: var(--mat); }
+
+  @media (max-width: 720px) {
+    .panel {
+      top: auto;
+      left: 0; right: 0;
+      bottom: 0;
+      width: auto;
+      max-height: 46%;
+      border-radius: 14px 14px 0 0;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .panel header { padding: 12px 16px 8px; }
+    .brand { font-size: 20px; }
+    .tag { display: none; }
+    .scroll { padding-inline: 16px; }
+    .hint { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tag3d { transition: none; }
+  }
+</style>
+
+<div id="stage" aria-label="3D view of the Supercade arcade cabinet"></div>
+<div id="labels" aria-hidden="true"></div>
+<div class="tip" id="tip" hidden></div>
+
+<aside class="panel">
+  <header>
+    <h1 class="brand">SUPER<span>CADE</span></h1>
+    <p class="tag">Flat-pack viewer. Pull the cabinet apart, check it against real people, try finishes.</p>
+  </header>
+  <div class="scroll">
+    <section class="group">
+      <div class="label">Size</div>
+      <div class="seg" id="size"></div>
+    </section>
+
+    <section class="group">
+      <div class="label">View</div>
+      <div class="seg" id="view">
+        <button type="button" data-v="assembled">Built</button>
+        <button type="button" data-v="exploded">Exploded</button>
+        <button type="button" data-v="flat">Flat-pack</button>
+      </div>
+      <div class="row">
+        <label for="spread" class="label" style="margin:0">Spread</label>
+        <input type="range" id="spread" min="0" max="1" step="0.01" value="0.6">
+      </div>
+    </section>
+
+    <section class="group">
+      <div class="label">People for scale</div>
+      <div class="chips" id="people"></div>
+      <div class="fit" id="fit"></div>
+    </section>
+
+    <section class="group">
+      <div class="label">Finish</div>
+      <div class="chips" id="finish"></div>
+      <div class="swatches" id="paint"></div>
+      <label class="toggle"><input type="checkbox" id="art" checked> Side art stripes</label>
+    </section>
+
+    <section class="group">
+      <div class="label">Dimensions</div>
+      <div class="seg" id="units">
+        <button type="button" data-u="in">Inches</button>
+        <button type="button" data-u="cm">Centimetres</button>
+      </div>
+      <dl class="dims" id="dims"></dl>
+    </section>
+
+    <section class="group">
+      <div class="label">Parts</div>
+      <ul class="parts" id="parts"></ul>
+    </section>
+  </div>
+</aside>
+<div class="hint">Drag to orbit · scroll to zoom · right-drag to pan</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="data.js"></script>
+<script src="people.js"></script>
+<script>
+(function () {
+  "use strict";
+  const DATA = window.SUPERCADE_DATA;
+  const IN = 0.0254;                      // metres per inch
+  const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ------------------------------------------------------------------ state
+  const PEOPLE = [
+    { id: "adult", name: "Adult", cm: 170, head: 0.065 },
+    { id: "kid8", name: "Kid, 8", cm: 128, head: 0.078 },
+    { id: "kid5", name: "Kid, 5", cm: 110, head: 0.088 },
+  ];
+  const FINISHES = [
+    { id: "cardboard", name: "Cardboard" },
+    { id: "birch", name: "Birch ply" },
+    { id: "walnut", name: "Walnut" },
+    { id: "paint", name: "Painted" },
+  ];
+  const PAINTS = [
+    ["Arcade red", "#d7263d"], ["Cobalt", "#2346c8"], ["Sunshine", "#f4bf2a"],
+    ["Midnight", "#1d1d33"], ["Mint", "#39c28b"], ["Bubblegum", "#ff6fb5"], ["Chalk", "#efefe9"],
+  ];
+  const state = {
+    build: "half", view: "assembled", spread: 0.6,
+    people: { adult: true, kid8: true, kid5: false },
+    finish: "cardboard", paint: "#d7263d", art: true, units: "in",
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem("supercade-viewer") || "{}");
+    Object.assign(state, saved, { view: "assembled" });
+  } catch (e) { /* storage unavailable: defaults are fine */ }
+  function save() {
+    try { localStorage.setItem("supercade-viewer", JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+  const build = () => DATA.builds.find(b => b.id === state.build) || DATA.builds[0];
+
+  // ------------------------------------------------------------------ units
+  function frac(v) {
+    const e = Math.round(v * 8), w = Math.floor(e / 8), r = e % 8;
+    if (!r) return w + "″";
+    const g = r % 4 === 0 ? 4 : r % 2 === 0 ? 2 : 1;
+    const f = (r / g) + "/" + (8 / g);
+    return (w ? w + " " : "") + f + "″";
+  }
+  const fmt = v => state.units === "in" ? frac(v) : (v * 2.54).toFixed(1) + " cm";
+  const fmtPair = (a, b) => state.units === "in"
+    ? frac(a).replace("″", "") + " × " + frac(b)
+    : (a * 2.54).toFixed(1) + " × " + (b * 2.54).toFixed(1) + " cm";
+  const ftIn = cm => { const i = Math.round(cm / 2.54); return Math.floor(i / 12) + "′" + (i % 12) + "″"; };
+
+  // ------------------------------------------------------------------ three setup
+  const stage = document.getElementById("stage");
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color("#dfe3dd");
+  scene.fog = new THREE.Fog("#dfe3dd", 9, 22);
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 60);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 0.4;
+  controls.maxDistance = 14;
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a9a90, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(2.5, 5, 3.5);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -3.5, right: 3.5, top: 3.5, bottom: -3.5, near: 0.5, far: 14 });
+  sun.shadow.bias = -0.0004;
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xfff1e0, 0.25);
+  fill.position.set(-3, 2, -2);
+  scene.add(fill);
+
+  // ------------------------------------------------------------------ canvas textures
+  function canvasTex(w, h, draw, repeat) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    draw(c.getContext("2d"), w, h);
+    const t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+    return t;
+  }
+  // tiny value noise for wood grain
+  function noise2(seed) {
+    const p = new Float32Array(64 * 64);
+    let s = seed;
+    for (let i = 0; i < p.length; i++) { s = (s * 16807) % 2147483647; p[i] = s / 2147483647; }
+    const sm = t => t * t * (3 - 2 * t);
+    return (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = sm(x - xi), yf = sm(y - yi);
+      const g = (a, b) => p[((a & 63) + (b & 63) * 64)];
+      const a = g(xi, yi) + (g(xi + 1, yi) - g(xi, yi)) * xf;
+      const b = g(xi, yi + 1) + (g(xi + 1, yi + 1) - g(xi, yi + 1)) * xf;
+      return a + (b - a) * yf;
+    };
+  }
+  function woodTex(light, dark, rings, seed) {
+    const n = noise2(seed);
+    const L = new THREE.Color(light), Dk = new THREE.Color(dark);
+    return canvasTex(512, 512, (g, w, h) => {
+      const img = g.createImageData(w, h);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          // long streaks running along the panel, gently wandering
+          const warp = n(x / 70, y / 160) * 2.4 + n(x / 14, y / 70) * 0.3;
+          let v = Math.sin((x / w * rings + warp) * Math.PI * 2) * 0.5 + 0.5;
+          v = Math.pow(v, 3) * 0.7 + n(x / 2, y / 90) * 0.3;
+          const i = (y * w + x) * 4;
+          img.data[i] = (L.r + (Dk.r - L.r) * v) * 255;
+          img.data[i + 1] = (L.g + (Dk.g - L.g) * v) * 255;
+          img.data[i + 2] = (L.b + (Dk.b - L.b) * v) * 255;
+          img.data[i + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+    }, true);
+  }
+  const TEX = {
+    cardboard: canvasTex(512, 512, (g, w, h) => {
+      g.fillStyle = "#b88a57"; g.fillRect(0, 0, w, h);
+      for (let x = 0; x < w; x += 8) {          // flutes showing through the liner
+        g.fillStyle = "rgba(255,235,200,0.10)"; g.fillRect(x, 0, 3, h);
+        g.fillStyle = "rgba(90,55,20,0.06)"; g.fillRect(x + 4, 0, 2, h);
+      }
+      for (let i = 0; i < 5000; i++) {
+        g.fillStyle = Math.random() < 0.5 ? "rgba(70,40,10,0.08)" : "rgba(255,240,210,0.08)";
+        g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1);
+      }
+    }, true),
+    birch: woodTex("#efdcb6", "#cfae7f", 16, 11),
+    walnut: woodTex("#6a4428", "#452a16", 14, 23),
+    mat: canvasTex(1024, 1024, (g, w, h) => {
+      g.fillStyle = "#2f6f5a"; g.fillRect(0, 0, w, h);
+      const step = w / 24;                       // tile = 24″, 1″ grid
+      for (let i = 0; i <= 24; i++) {
+        const major = i % 6 === 0;
+        g.fillStyle = major ? "rgba(236,246,240,0.55)" : "rgba(236,246,240,0.22)";
+        const lw = major ? 2 : 1;
+        g.fillRect(i * step - lw / 2, 0, lw, h);
+        g.fillRect(0, i * step - lw / 2, w, lw);
+      }
+      g.strokeStyle = "rgba(236,246,240,0.25)";
+      g.beginPath(); g.moveTo(0, h); g.lineTo(w, 0); g.stroke();
+    }, true),
+  };
+  TEX.mat.repeat.set(12, 12);
+
+  // floor: 6 m x 6 m cutting mat, 24″ texture tile
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(24 * 24 * IN, 24 * 24 * IN),
+    new THREE.MeshStandardMaterial({ map: TEX.mat, roughness: 0.95 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // ------------------------------------------------------------------ screen (attract mode)
+  const screenCanvas = document.createElement("canvas");
+  screenCanvas.width = 320; screenCanvas.height = 180;
+  const screenTex = new THREE.CanvasTexture(screenCanvas);
+  screenTex.encoding = THREE.sRGBEncoding;
+  const stars = Array.from({ length: 70 }, () => [Math.random() * 320, Math.random() * 180, 0.4 + Math.random() * 1.6]);
+  function drawScreen(time) {
+    const g = screenCanvas.getContext("2d");
+    g.fillStyle = "#07061a"; g.fillRect(0, 0, 320, 180);
+    for (const s of stars) {
+      s[0] -= s[2] * 0.8; if (s[0] < 0) s[0] += 320;
+      g.fillStyle = s[2] > 1.4 ? "#ffffff" : "#6f7bd6";
+      g.fillRect(s[0] | 0, s[1] | 0, s[2] > 1.2 ? 2 : 1, s[2] > 1.2 ? 2 : 1);
+    }
+    g.textAlign = "center";
+    g.font = "30px Bungee, Impact, sans-serif";
+    g.fillStyle = "#ff3b6b"; g.fillText("SUPERCADE", 162, 86);
+    g.fillStyle = "#ffd23f"; g.fillText("SUPERCADE", 160, 84);
+    if (Math.floor(time / 600) % 2 === 0) {
+      g.font = "13px 'IBM Plex Mono', monospace";
+      g.fillStyle = "#ffffff"; g.fillText("INSERT COIN", 160, 128);
+    }
+    g.font = "10px 'IBM Plex Mono', monospace";
+    g.fillStyle = "#8ee6b8"; g.fillText("1UP 000000   HI 031337", 160, 20);
+    screenTex.needsUpdate = true;
+  }
+
+  // ------------------------------------------------------------------ materials
+  function thickness(b) {
+    if (state.finish === "cardboard") return 0.28;       // double-wall board
+    return b.scale >= 1 ? 0.5 : 0.25;                    // 1/2″ ply, 1/4″ at half scale
+  }
+  function makeMaterials(b) {
+    const f = state.finish;
+    const std = o => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.85, metalness: 0 }, o));
+    let face, edge;
+    if (f === "cardboard") {
+      face = std({ map: TEX.cardboard, roughness: 0.97 });
+      edge = std({ color: "#9c7244", roughness: 1 });
+    } else if (f === "birch") {
+      face = std({ map: TEX.birch, roughness: 0.7 });
+      edge = std({ color: "#e2c795", roughness: 0.8 });
+    } else if (f === "walnut") {
+      face = std({ map: TEX.walnut, roughness: 0.55 });
+      edge = std({ color: "#4a2e19", roughness: 0.7 });
+    } else {
+      face = std({ color: state.paint, roughness: 0.45 });
+      edge = std({ color: new THREE.Color(state.paint).multiplyScalar(0.8), roughness: 0.5 });
+    }
+    for (const m of [face, edge]) if (m.map) { m.map.repeat.set(1 / 0.6, 1 / 0.6); }
+    return { face, edge };
+  }
+  function sideArtTexture(b, dMax, hMax, mirror) {
+    // Painted side with racing stripes that follow the cabinet's own slope.
+    const base = state.finish === "paint" ? state.paint : null;
+    return canvasTex(512, 1024, (g, w, h) => {
+      const sx = w / dMax, sy = h / hMax;
+      const P = k => [b.side[k][1] * sx, h - b.side[k][0] * sy];
+      if (base) { g.fillStyle = base; g.fillRect(0, 0, w, h); }
+      else {
+        const img = (state.finish === "cardboard" ? TEX.cardboard : state.finish === "birch" ? TEX.birch : TEX.walnut).image;
+        for (let y = 0; y < h; y += 256) for (let x = 0; x < w; x += 256) g.drawImage(img, x, y, 256, 256);
+      }
+      const light = base && new THREE.Color(base).getHSL({}).l > 0.6;
+      const cols = light ? ["#1d1d33", "#d7263d", "#2346c8"] : ["#ffffff", "#ffd23f", "#ff3b6b"];
+      const [Gx, Gy] = P("G"), [Hx, Hy] = P("H");
+      // three stripes parallel to the kick slope, from the floor up the back
+      for (let i = 0; i < 3; i++) {
+        const off = (i * 0.045 + 0.05) * h;
+        g.fillStyle = cols[i];
+        g.beginPath();
+        g.moveTo(0, Hy - off);
+        g.lineTo(Gx - 6, Gy - off);
+        g.lineTo(Gx - 6, Gy - off - 0.025 * h);
+        g.lineTo(0, Hy - off - 0.025 * h);
+        g.closePath(); g.fill();
+      }
+      g.save();
+      // the right-hand panel shows this texture from behind, so flip its lettering
+      g.translate(w * 0.18, h * 0.42);
+      if (mirror) g.scale(-1, 1);
+      g.rotate(mirror ? Math.PI / 2 : -Math.PI / 2);
+      g.font = `${Math.round(w * 0.13)}px Bungee, Impact, sans-serif`;
+      g.fillStyle = cols[1];
+      g.fillText("SUPERCADE", 0, 0);
+      g.restore();
+    });
+  }
+
+  // ------------------------------------------------------------------ cabinet
+  let cabinet = null;     // { group, parts[], people[], bounds }
+  const peopleGroup = new THREE.Group();
+  scene.add(peopleGroup);
+
+  // A panel is a face line a -> b in the side profile (h, d) plus the normal of
+  // its visible face; its thickness sits behind that face.
+  function panelFrame(p) {
+    const pa = p.a, pc = p.b;
+    const dh = pc[0] - pa[0], dd = pc[1] - pa[1], L = Math.hypot(dh, dd);
+    const v = new THREE.Vector3(0, dh / L, dd / L);
+    const outW = new THREE.Vector3(0, p.out[0], p.out[1]).normalize();
+    const X = new THREE.Vector3(1, 0, 0);
+    const Z = new THREE.Vector3().crossVectors(X, v);
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, v, Z));
+    const mid = new THREE.Vector3(0, (pa[0] + pc[0]) / 2 * IN, (pa[1] + pc[1]) / 2 * IN);
+    const out = Z.dot(outW) > 0 ? 1 : -1;               // local z sign of the visible face
+    return { L, v, nIn: outW.clone().negate(), outW, q, mid, out };
+  }
+
+  function addPart(list, o) {
+    o.mesh.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.userData.part = o; } });
+    list.push(o);
+    return o;
+  }
+
+  function buildCabinet() {
+    const b = build();
+    const t = thickness(b);
+    const W = b.innerWidth;
+    const { face, edge } = makeMaterials(b);
+    const group = new THREE.Group();
+    const parts = [];
+
+    // --- P1 side panels: the CAD profile, extruded
+    const pts = b.order.split("").map(k => new THREE.Vector2(b.side[k][1] * IN, b.side[k][0] * IN));
+    const shape = new THREE.Shape(pts);
+    const dMax = Math.max(...b.order.split("").map(k => b.side[k][1]));
+    const hMax = Math.max(...b.order.split("").map(k => b.side[k][0]));
+    for (const s of [-1, 1]) {
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: t * IN, bevelEnabled: false });
+      geo.translate(-dMax / 2 * IN, -hMax / 2 * IN, -t / 2 * IN);
+      let capMat = face.clone();
+      if (state.art) {
+        const art = sideArtTexture(b, dMax, hMax, s > 0);
+        art.repeat.set(1 / (dMax * IN), 1 / (hMax * IN));
+        capMat = new THREE.MeshStandardMaterial({ map: art, roughness: state.finish === "paint" ? 0.45 : 0.8 });
+      }
+      const mesh = new THREE.Mesh(geo, [capMat, edge.clone()]);
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -Math.PI / 2, 0));
+      // after rotating, local +z points to world -x; the outer face is the one facing away from the centre
+      const out = s > 0 ? -1 : 1;
+      addPart(parts, {
+        id: "P1", name: s < 0 ? "Side panel (left)" : "Side panel (right)",
+        size: [hMax, dMax, t], mesh, out,
+        home: { pos: new THREE.Vector3(s * (W / 2 + t / 2) * IN, hMax / 2 * IN, dMax / 2 * IN), q },
+        dir: new THREE.Vector3(s, 0, 0), dist: 1,
+      });
+    }
+
+    // --- P2-P9 outer panels and the P4a-c screen recess behind the front frame
+    const frames = {};
+    const recessMat = new THREE.MeshStandardMaterial({ color: "#141417", roughness: 0.92 });
+    for (const p of b.panels) {
+      const fr = panelFrame(p);
+      frames[p.id] = fr;
+      const Wm = W * IN, Lm = fr.L * IN;
+      const sh = new THREE.Shape();
+      sh.moveTo(-Wm / 2, -Lm / 2); sh.lineTo(Wm / 2, -Lm / 2); sh.lineTo(Wm / 2, Lm / 2); sh.lineTo(-Wm / 2, Lm / 2); sh.closePath();
+      for (const hole of p.holes || []) {
+        const path = new THREE.Path();
+        if (hole.rect) {
+          const [x0, s0, x1, s1] = hole.rect.map(v => v * IN);
+          path.moveTo(x0 - Wm / 2, s0 - Lm / 2); path.lineTo(x1 - Wm / 2, s0 - Lm / 2);
+          path.lineTo(x1 - Wm / 2, s1 - Lm / 2); path.lineTo(x0 - Wm / 2, s1 - Lm / 2); path.closePath();
+        } else if (hole.oval) {
+          const [cx, cs, ow, oh] = hole.oval.map(v => v * IN);
+          path.absellipse(cx - Wm / 2, cs - Lm / 2, ow / 2, oh / 2, 0, Math.PI * 2, false, 0);
+        }
+        sh.holes.push(path);
+      }
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: t * IN, bevelEnabled: false, curveSegments: 24 });
+      geo.translate(0, 0, -t / 2 * IN);
+      const mats = p.recess ? [recessMat.clone(), recessMat.clone()] : [face.clone(), edge.clone()];
+      const mesh = new THREE.Mesh(geo, mats);
+      const dir = p.explode ? new THREE.Vector3(0, p.explode[0], p.explode[1]).normalize() : fr.outW.clone();
+      addPart(parts, {
+        id: p.id, name: p.name, size: [fr.L, W, t], mesh, out: fr.out,
+        home: { pos: fr.mid.clone().addScaledVector(fr.nIn, t / 2 * IN), q: fr.q },
+        dir, dist: p.recess ? 0.55 : p.id === "P9" ? 1.6 : p.id === "P4" ? 1.3 : 1,
+      });
+    }
+
+    // --- P12 control plate on top of the deck, with the real control layout
+    const deck = frames.P5, cp = b.controls;
+    {
+      const pt = 0.2;                                       // 5 mm plate
+      const Wm = W * IN, Lm = deck.L * IN;
+      const geo = new THREE.BoxGeometry(Wm, Lm, pt * IN);
+      const plate = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: "#141418", roughness: 0.6 }));
+      const zTop = deck.out * pt / 2 * IN;
+      const off = (W - cp.width) / 2, offY = (deck.L - cp.height) / 2;
+      const P1c = { button: "#e53935", stick: "#e53935" }, P2c = { button: "#1e63e9", stick: "#1e63e9" };
+      for (const [x, y, dia, kind] of cp.holes) {
+        if (kind === "mount") continue;
+        const lx = (x + off - W / 2) * IN, ly = (y + offY - deck.L / 2) * IN;
+        const p2 = x > cp.width / 2;
+        let m;
+        if (kind === "stick") {
+          m = new THREE.Group();
+          const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1.1 * IN, 12), new THREE.MeshStandardMaterial({ color: "#c9ccd1", metalness: 0.6, roughness: 0.3 }));
+          shaft.position.y = 0.55 * IN;
+          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.0175, 24, 16), new THREE.MeshStandardMaterial({ color: p2 ? P2c.stick : P1c.stick, roughness: 0.25 }));
+          ball.position.y = 1.2 * IN;
+          const dust = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.002, 24), new THREE.MeshStandardMaterial({ color: "#222", roughness: 0.8 }));
+          m.add(shaft, ball, dust);
+        } else {
+          const colour = kind === "button" ? (p2 ? P2c.button : P1c.button)
+            : kind === "start" ? "#f5f5f0" : kind === "coin" ? "#ffd23f" : "#2fbf71";
+          m = new THREE.Group();
+          const r = dia / 2000;
+          const bezel = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.12, r * 1.15, 0.003, 28), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.35 }));
+          const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.86, r * 0.86, 0.006, 28), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.25 }));
+          cap.position.y = 0.004;
+          m.add(bezel, cap);
+        }
+        // controls are built along +y; turn them to face the plate's outer side
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, deck.out));
+        m.position.set(lx, ly, zTop);
+        plate.add(m);
+      }
+      addPart(parts, {
+        id: "P12", name: b.scale < 1 ? "Control plate (5 mm Foamex)" : "Control plate",
+        size: [deck.L, W, pt], mesh: plate, out: deck.out,
+        home: { pos: deck.mid.clone().addScaledVector(deck.nIn, -pt / 2 * IN), q: deck.q },
+        dir: deck.nIn.clone().negate(), dist: 1.7,
+      });
+    }
+
+    // --- Monitor behind the P4b screen board's window
+    const bez = frames.P4b;
+    let monitorBottom = 0;
+    {
+      const [sw, shh] = b.screen;
+      const depth = b.scale < 1 ? 0.6 : 1.8, border = b.scale < 1 ? 0.35 : 0.8;
+      const mon = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry((sw + 2 * border) * IN, (shh + 2 * border) * IN, depth * IN),
+        new THREE.MeshStandardMaterial({ color: "#1b1c20", roughness: 0.5 }));
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(sw * IN, shh * IN), new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }));
+      glass.position.z = bez.out * (depth / 2 * IN + 0.0005);
+      // face out, keep the picture upright and unmirrored
+      if (bez.out < 0) glass.rotation.y = Math.PI;
+      if (bez.v.y < 0) glass.rotation.z = Math.PI;
+      mon.add(body, glass);
+      const local = new THREE.Vector3(0, 0, -bez.out * (t / 2 + depth / 2 + 0.05) * IN);
+      const pos = local.clone().applyQuaternion(bez.q).add(bez.mid.clone().addScaledVector(bez.nIn, t / 2 * IN));
+      addPart(parts, {
+        id: "—", name: b.scale < 1 ? "13.3″ portable monitor" : "27″ monitor",
+        size: [shh + 2 * border, sw + 2 * border, depth], mesh: mon, out: bez.out, noList: true,
+        home: { pos, q: bez.q }, dir: new THREE.Vector3(0, 0, 1), dist: 0.25,
+      });
+      // lowest point of the monitor, to set the screen shelf under it
+      mon.position.copy(pos); mon.quaternion.copy(bez.q); mon.updateMatrixWorld(true);
+      monitorBottom = new THREE.Box3().setFromObject(mon).min.y / IN;
+      mon.position.set(0, 0, 0); mon.quaternion.identity();
+    }
+
+    // --- P10/P11 box-beam shelves
+    const [bt, bs] = b.beam;
+    function beam(id, name, topH, dFront) {
+      const geo = new THREE.BoxGeometry(W * IN, bs * IN, bt * IN);
+      const mesh = new THREE.Mesh(geo, [edge.clone(), edge.clone(), face.clone(), face.clone(), edge.clone(), edge.clone()]);
+      addPart(parts, {
+        id, name, size: [bt, W, bs], mesh, out: 1,
+        home: { pos: new THREE.Vector3(0, (topH - bs / 2) * IN, (dFront - bt / 2) * IN), q: new THREE.Quaternion() },
+        dir: new THREE.Vector3(0, 0, 1), dist: 0.8, flatUp: true,
+      });
+    }
+    const S = b.side;
+    const board = b.panels.find(p => p.id === "P4b");
+    const frontAt = h => { // just behind the screen board (and the monitor on it) at height h
+      const [h1, d1] = board.a, [h2, d2] = board.b;
+      return d1 + (d2 - d1) * (h - h1) / (h2 - h1) - t - (b.scale < 1 ? 0.7 : 2.0);
+    };
+    const shelfTop = monitorBottom - 0.05;
+    beam("P10", "Screen shelf", shelfTop, Math.max(bt + t, frontAt(shelfTop - bs)));
+    const kickAt = h => S.H[1] + (S.G[1] - S.H[1]) * h / S.G[0] - t - 0.3;
+    if (b.shelfH > bs + 0.5) beam("P11", "Lower shelf", b.shelfH, Math.min(kickAt(b.shelfH - bs), 2 * b.scale + bt));
+
+    for (const p of parts) group.add(p.mesh);
+
+    // --- flat-pack layout: every part lying outer-face-up on the mat
+    const q90 = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    const qm90 = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    const items = parts.map(p => {
+      const bb = new THREE.Box3().setFromObject(new THREE.Mesh(p.mesh.geometry || new THREE.BoxGeometry()));
+      let sx, sy, sz;
+      if (p.mesh.geometry) { const s = bb.getSize(new THREE.Vector3()); [sx, sy, sz] = [s.x, s.y, s.z]; }
+      else { const s = new THREE.Box3().setFromObject(p.mesh).getSize(new THREE.Vector3()); [sx, sy, sz] = [s.x, s.y, s.z]; }
+      // shelves lie as they sit (top up); everything else lies on its face
+      return p.flatUp ? { p, sx, sy: sz, sz: sy } : { p, sx, sy, sz };
+    });
+    const gap = 0.06 * Math.max(0.6, b.scale) + 0.03;
+    const totalArea = items.reduce((a, it) => a + (it.sx + gap) * (it.sy + gap), 0);
+    const rowMax = Math.max(1.0, Math.sqrt(totalArea) * 1.35);
+    const sorted = items.slice().sort((a, c) => c.sy - a.sy);
+    let x = 0, z = 0, rowDepth = 0, maxX = 0;
+    for (const it of sorted) {
+      if (x > 0 && x + it.sx > rowMax) { x = 0; z += rowDepth + gap; rowDepth = 0; }
+      it.fx = x + it.sx / 2; it.fz = z + it.sy / 2;
+      x += it.sx + gap; maxX = Math.max(maxX, x); rowDepth = Math.max(rowDepth, it.sy);
+    }
+    const totalZ = z + rowDepth;
+    for (const it of items) {
+      const up = it.p.flatUp ? new THREE.Quaternion() : (it.p.out > 0 ? q90 : qm90);
+      const h = it.sz;
+      it.p.flat = {
+        pos: new THREE.Vector3(it.fx - maxX / 2, h / 2 + 0.001, it.fz - totalZ / 2),
+        q: up,
+      };
+    }
+
+    const size = new THREE.Vector3(W * IN + 2 * t * IN, hMax * IN, dMax * IN);
+    return { b, group, parts, size, flatExtent: new THREE.Vector2(maxX, totalZ), t };
+  }
+
+  // ------------------------------------------------------------------ people
+  // Real body meshes (CC0, Blender Studio Human Base Meshes) from people.js;
+  // until they're parsed, or if they can't be, a simple peg figure stands in.
+  const bodyGeo = {};
+  function loadBodies() {
+    const packed = window.SUPERCADE_PEOPLE || {};
+    if (!THREE.GLTFLoader) return;
+    const loader = new THREE.GLTFLoader();
+    const jobs = Object.entries(packed).map(([id, b64]) => new Promise(done => {
+      const bin = atob(b64), buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      loader.parse(buf.buffer, "", gltf => {
+        gltf.scene.traverse(o => {
+          if (o.isMesh && !bodyGeo[id]) {
+            const g = o.geometry.clone();
+            g.applyMatrix4(o.matrixWorld);
+            g.computeVertexNormals();
+            g.computeBoundingBox();
+            bodyGeo[id] = g;
+          }
+        });
+        done();
+      }, () => done());
+    }));
+    Promise.all(jobs).then(() => { if (cabinet) placePeople(); });
+  }
+  const skin = new THREE.MeshStandardMaterial({ color: "#b9c3be", roughness: 0.62, metalness: 0 });
+
+  function makePerson(p) {
+    const H = p.cm / 100;
+    const geo = bodyGeo[p.id];
+    if (geo) {
+      const g = new THREE.Group();
+      const m = new THREE.Mesh(geo, skin);
+      const k = H / (geo.boundingBox.max.y - geo.boundingBox.min.y);
+      m.scale.setScalar(k);
+      m.position.y = -geo.boundingBox.min.y * k;
+      m.castShadow = true;
+      g.add(m);
+      g.userData = { H, person: p };
+      return g;
+    }
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: "#9fb0a7", roughness: 0.75 });
+    const hr = H * p.head;
+    const cyl = (rt, rb, h, x, y, rz) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 18), mat);
+      m.position.set(x, y, 0); if (rz) m.rotation.z = rz; m.castShadow = true; g.add(m); return m;
+    };
+    const legH = H * 0.47;
+    cyl(H * 0.034, H * 0.028, legH, -H * 0.055, legH / 2);
+    cyl(H * 0.034, H * 0.028, legH, H * 0.055, legH / 2);
+    const torsoH = H - legH - 2 * hr - H * 0.03;
+    cyl(H * 0.095, H * 0.08, torsoH, 0, legH + torsoH / 2);
+    const armH = torsoH * 1.05;
+    cyl(H * 0.026, H * 0.022, armH, -H * 0.125, legH + torsoH - armH / 2, 0.07);
+    cyl(H * 0.026, H * 0.022, armH, H * 0.125, legH + torsoH - armH / 2, -0.07);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(hr, 24, 18), mat);
+    head.position.y = H - hr; head.castShadow = true; g.add(head);
+    g.userData = { H, person: p };
+    return g;
+  }
+
+  // ------------------------------------------------------------------ assembling it all
+  const labelsEl = document.getElementById("labels");
+  let labelEls = [], personLabels = [];
+
+  function rebuild(keepCamera) {
+    if (cabinet) {
+      scene.remove(cabinet.group);
+      cabinet.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    }
+    cabinet = buildCabinet();
+    scene.add(cabinet.group);
+
+    labelsEl.textContent = "";
+    labelEls = cabinet.parts.filter(p => !p.noList).map(p => {
+      const el = document.createElement("div");
+      el.className = "tag3d"; el.textContent = p.id;
+      labelsEl.appendChild(el);
+      return { el, p };
+    });
+    placePeople();
+    renderPanel();
+    if (!keepCamera) frameCamera(true);
+  }
+
+  function placePeople() {
+    peopleGroup.clear();
+    personLabels.forEach(l => l.el.remove());
+    personLabels = [];
+    const on = PEOPLE.filter(p => state.people[p.id]);
+    const s = cabinet.size, b = cabinet.b;
+    on.forEach((p, i) => {
+      const fig = makePerson(p);
+      // line up beside the cabinet, level with the control deck, so nobody hides it
+      // arms hang out in an A-pose, so give each body about half its height of room
+      const x = -(s.x / 2 + 0.12 + on.slice(0, i + 1).reduce((acc, q, j) => acc + q.cm / 100 * (j === i ? 0.27 : 0.5), 0));
+      fig.userData.home = new THREE.Vector3(x, 0, b.side.E[1] * IN * 0.75);
+      fig.userData.flat = new THREE.Vector3(-cabinet.flatExtent.x / 2 - 0.35 - i * 0.42, 0, cabinet.flatExtent.y / 2 - 0.2);
+      peopleGroup.add(fig);
+      const el = document.createElement("div");
+      el.className = "tag3d person";
+      el.textContent = `${p.name} · ${state.units === "in" ? ftIn(p.cm) : p.cm + " cm"}`;
+      labelsEl.appendChild(el);
+      personLabels.push({ el, fig });
+    });
+  }
+
+  // ------------------------------------------------------------------ camera
+  let camTween = null;
+  function camGoal() {
+    const s = cabinet.size;
+    const narrow = Math.max(1, Math.pow(1 / Math.max(camera.aspect, 0.3), 0.8));   // portrait phones need more distance
+    const tallest = Math.max(0, ...PEOPLE.filter(p => state.people[p.id]).map(p => p.cm / 100));
+    const H = Math.max(s.y, tallest, 1.0);
+    if (state.view === "flat") {
+      const e = Math.max(cabinet.flatExtent.x, cabinet.flatExtent.y) + 1;
+      return { target: new THREE.Vector3(-0.2, 0, 0), pos: new THREE.Vector3(e * 0.35, e * 1.05, e * 0.95).multiplyScalar(narrow) };
+    }
+    const n = PEOPLE.filter(p => state.people[p.id]).length;
+    const target = new THREE.Vector3(-n * 0.22, H * 0.45, s.z * 0.45);
+    const k = (state.view === "exploded" ? 1.3 + state.spread * 0.4 : 1.05) * (1 + n * 0.08) * narrow;
+    return { target, pos: target.clone().add(new THREE.Vector3(H * 1.2 * k, H * 0.35 * k + 0.15, H * 1.9 * k)) };
+  }
+  function frameCamera(instant) {
+    const g = camGoal();
+    if (instant || REDUCED) {
+      controls.target.copy(g.target); camera.position.copy(g.pos); controls.update(); camTween = null; return;
+    }
+    camTween = { t: 0, fromT: controls.target.clone(), fromP: camera.position.clone(), to: g };
+  }
+  controls.addEventListener("start", () => { camTween = null; });
+
+  // ------------------------------------------------------------------ animation
+  let explode = 0, flat = 0;
+  const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
+  const ease = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+  function step(dt) {
+    const wantE = state.view === "exploded" ? state.spread : 0;
+    const wantF = state.view === "flat" ? 1 : 0;
+    const rate = REDUCED ? 1 : Math.min(1, dt * 3.2);
+    explode += (wantE - explode) * rate;
+    flat += (wantF - flat) * (REDUCED ? 1 : Math.min(1, dt * 2.4));
+    if (Math.abs(wantE - explode) < 1e-4) explode = wantE;
+    if (Math.abs(wantF - flat) < 1e-4) flat = wantF;
+    const f = ease(flat);
+    const reach = 0.28 + 0.3 * cabinet.b.scale;
+    for (const p of cabinet.parts) {
+      tmpV.copy(p.home.pos).addScaledVector(p.dir, explode * reach * p.dist);
+      p.mesh.position.lerpVectors(tmpV, p.flat.pos, f);
+      p.mesh.position.y += Math.sin(Math.PI * f) * 0.45 * cabinet.b.scale;   // lift clear while flipping
+      p.mesh.quaternion.slerpQuaternions ? p.mesh.quaternion.slerpQuaternions(p.home.q, p.flat.q, f)
+        : p.mesh.quaternion.copy(p.home.q).slerp(p.flat.q, f);
+    }
+    for (const fig of peopleGroup.children) fig.position.lerpVectors(fig.userData.home, fig.userData.flat, f);
+
+    if (camTween) {
+      camTween.t = Math.min(1, camTween.t + dt / 0.9);
+      const k = ease(camTween.t);
+      controls.target.lerpVectors(camTween.fromT, camTween.to.target, k);
+      camera.position.lerpVectors(camTween.fromP, camTween.to.pos, k);
+      if (camTween.t >= 1) camTween = null;
+    }
+  }
+
+  const proj = new THREE.Vector3();
+  function placeLabels() {
+    const show = Math.max(explode / Math.max(state.spread, 0.01) * (state.view === "exploded" ? 1 : 0), flat) > 0.6;
+    const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+    for (const { el, p } of labelEls) {
+      p.mesh.getWorldPosition(proj);
+      if (flat < 0.5) proj.addScaledVector(p.dir, 0.02);
+      proj.project(camera);
+      el.style.left = ((proj.x + 1) / 2 * w) + "px";
+      el.style.top = ((1 - proj.y) / 2 * h) + "px";
+      el.style.opacity = show && proj.z < 1 ? 1 : 0;
+    }
+    for (const { el, fig } of personLabels) {
+      proj.set(fig.position.x, fig.userData.H + 0.12, fig.position.z).project(camera);
+      el.style.left = ((proj.x + 1) / 2 * w) + "px";
+      el.style.top = ((1 - proj.y) / 2 * h) + "px";
+      el.style.opacity = proj.z < 1 ? 1 : 0;
+    }
+  }
+
+  // ------------------------------------------------------------------ hover
+  const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+  const tip = document.getElementById("tip");
+  let hot = null, pointer = null;
+  function setHot(p) {
+    if (hot === p) return;
+    const glow = (part, on) => part && part.mesh.traverse(m => {
+      if (!m.isMesh) return;
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(mt => mt.emissive && mt.emissive.setHex(on ? 0x6a4a00 : 0x000000));
+    });
+    glow(hot, false); hot = p; glow(hot, true);
+    document.querySelectorAll("#parts li").forEach(li => li.classList.toggle("hot", !!p && li.dataset.key === p.key));
+  }
+  function describe(p) {
+    const [l, w, th] = p.size;
+    return `<b>${p.id}</b>${p.name}<br><span class="m">${fmtPair(l, w)} · ${fmt(th)} thick</span>`;
+  }
+  renderer.domElement.addEventListener("pointermove", e => {
+    pointer = e;
+    const r = renderer.domElement.getBoundingClientRect();
+    mouse.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+    ray.setFromCamera(mouse, camera);
+    const hit = ray.intersectObjects(cabinet.group.children, true)[0];
+    const p = hit ? hit.object.userData.part : null;
+    setHot(p || null);
+    if (p) {
+      tip.innerHTML = describe(p); tip.hidden = false;
+      tip.style.left = e.clientX + "px"; tip.style.top = e.clientY + "px";
+    } else tip.hidden = true;
+  });
+  renderer.domElement.addEventListener("pointerleave", () => { setHot(null); tip.hidden = true; });
+
+  // ------------------------------------------------------------------ panel
+  function segButtons(el, items, key, onPick) {
+    el.textContent = "";
+    for (const [val, label] of items) {
+      const bt = document.createElement("button");
+      bt.type = "button"; bt.textContent = label;
+      bt.setAttribute("aria-pressed", String(state[key] === val));
+      bt.addEventListener("click", () => { state[key] = val; save(); onPick(val); });
+      el.appendChild(bt);
+    }
+  }
+  function syncPressed() {
+    document.querySelectorAll("#view button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === state.view)));
+    document.querySelectorAll("#units button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.u === state.units)));
+  }
+  function renderPanel() {
+    const b = cabinet.b, t = cabinet.t;
+    segButtons(document.getElementById("size"), DATA.builds.map(x => [x.id, x.label]), "build", () => rebuild(false));
+
+    const peopleEl = document.getElementById("people");
+    peopleEl.textContent = "";
+    for (const p of PEOPLE) {
+      const c = document.createElement("button");
+      c.type = "button"; c.className = "chip";
+      c.setAttribute("aria-pressed", String(!!state.people[p.id]));
+      c.innerHTML = `${p.name} <small>${state.units === "in" ? ftIn(p.cm) : p.cm + " cm"}</small>`;
+      c.addEventListener("click", () => { state.people[p.id] = !state.people[p.id]; save(); placePeople(); renderPanel(); frameCamera(false); });
+      peopleEl.appendChild(c);
+    }
+
+    // controls vs elbow height: a comfortable deck sits at or a little under the elbow
+    const deckH = (b.side.D[0] + b.side.E[0]) / 2;
+    const fitEl = document.getElementById("fit");
+    fitEl.textContent = "";
+    for (const p of PEOPLE.filter(p => state.people[p.id])) {
+      const elbow = p.cm * 0.63 / 2.54;
+      const diff = deckH - elbow;
+      const ok = diff <= 1.5 && diff >= -7;
+      const row = document.createElement("p");
+      const verdict = ok ? "comfy" : diff > 0 ? `${fmt(Math.abs(diff))} too high` : `${fmt(Math.abs(diff))} too low`;
+      row.innerHTML = `<span>${p.name}: elbow ≈ ${fmt(elbow)}</span><span class="pill ${ok ? "good" : "warn"}">${verdict}</span>`;
+      fitEl.appendChild(row);
+    }
+
+    const fin = document.getElementById("finish");
+    fin.textContent = "";
+    for (const f of FINISHES) {
+      const c = document.createElement("button");
+      c.type = "button"; c.className = "chip"; c.textContent = f.name;
+      c.setAttribute("aria-pressed", String(state.finish === f.id));
+      c.addEventListener("click", () => { state.finish = f.id; save(); rebuild(true); });
+      fin.appendChild(c);
+    }
+    const paint = document.getElementById("paint");
+    paint.textContent = "";
+    paint.dataset.off = String(state.finish !== "paint");
+    for (const [name, hex] of PAINTS) {
+      const s = document.createElement("button");
+      s.type = "button"; s.className = "swatch"; s.style.background = hex;
+      s.title = name; s.setAttribute("aria-label", "Paint " + name);
+      s.setAttribute("aria-pressed", String(state.finish === "paint" && state.paint === hex));
+      s.addEventListener("click", () => { state.paint = hex; state.finish = "paint"; save(); rebuild(true); });
+      paint.appendChild(s);
+    }
+    document.getElementById("art").checked = state.art;
+
+    const dims = document.getElementById("dims");
+    const rows = [
+      ["Height", fmt(b.side.B[0])], ["Depth", fmt(b.side.E[1])],
+      ["Outside width", fmt(b.innerWidth + 2 * t)], ["Control deck", fmt(deckH)],
+      ["Screen", b.scale < 1 ? "13.3″" : "27″"], ["Board", fmt(t)],
+    ];
+    dims.innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+
+    const list = document.getElementById("parts");
+    list.textContent = "";
+    cabinet.parts.forEach((p, i) => {
+      if (p.noList) return;
+      p.key = p.id + ":" + i;
+      const li = document.createElement("li");
+      li.dataset.key = p.key;
+      li.innerHTML = `<b>${p.id}</b><span>${p.name}</span><span class="sz">${fmtPair(p.size[0], p.size[1])}</span>`;
+      li.addEventListener("mouseenter", () => setHot(p));
+      li.addEventListener("mouseleave", () => setHot(null));
+      list.appendChild(li);
+    });
+    syncPressed();
+  }
+
+  document.querySelectorAll("#view button").forEach(bt => bt.addEventListener("click", () => {
+    state.view = bt.dataset.v; syncPressed(); frameCamera(false);
+  }));
+  document.querySelectorAll("#units button").forEach(bt => bt.addEventListener("click", () => {
+    state.units = bt.dataset.u; save(); placePeople(); renderPanel();
+  }));
+  const spread = document.getElementById("spread");
+  spread.value = state.spread;
+  spread.addEventListener("input", () => {
+    state.spread = +spread.value; save();
+    if (state.view === "assembled") { state.view = "exploded"; syncPressed(); frameCamera(false); }
+  });
+  document.getElementById("art").addEventListener("change", e => { state.art = e.target.checked; save(); rebuild(true); });
+
+  // ------------------------------------------------------------------ loop
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    // on phones the panel covers the bottom: nudge the view up
+    camera.setViewOffset(w, h, 0, w < 720 ? h * 0.18 : 0, w, h);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+
+  let last = performance.now(), lastScreen = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    step(dt);
+    controls.update();
+    if (now - lastScreen > 80) { drawScreen(now); lastScreen = now; }
+    placeLabels();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  rebuild(false);
+  loadBodies();
+  requestAnimationFrame(frame);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => rebuild(true));
+})();
+</script>
+<!-- VIEWER:END -->
+</body>
+</html>

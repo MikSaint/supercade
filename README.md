@@ -10,6 +10,12 @@ The modern arcade cabin for everyone
 <img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/53439136-2454-490c-8d50-3b23c2783e36" />
 
 
+## Build it at home
+
+`cardboard/` has printable plans (full size, kid height and half scale), a
+tabletop control box, 1:1 templates, and a 3D flat-pack viewer
+(`cardboard/viewer/index.html`). See `cardboard/README.md`.
+
 Todos:
 - Update the CAD files to include proper screw holes.
 - Create a list of comonents needed for the kit:
