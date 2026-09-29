@@ -10,6 +10,18 @@ The modern arcade cabin for everyone
 <img width="1024" height="1024" alt="image" src="https://github.com/user-attachments/assets/53439136-2454-490c-8d50-3b23c2783e36" />
 
 
+> **Development has moved to Super Labs.** Try the 3D builder at
+> [supercade.sprlbs.com](https://supercade.sprlbs.com) and read the story at
+> [sprlbs.com/lab/supercade](https://www.sprlbs.com/lab/supercade). This repo
+> keeps the original 2016 files and a snapshot of the plans and builder.
+
+## Build it at home
+
+`cardboard/` has printable plans for the Mini (a bartop that stands on a
+table) and the full-size and kid-height cabinets, a tabletop control box, 1:1
+templates, DXF/SVG cut files for cardboard, plastic or wood, and the 3D
+builder (`cardboard/viewer/index.html`). See `cardboard/README.md`.
+
 Todos:
 - Update the CAD files to include proper screw holes.
 - Create a list of comonents needed for the kit:

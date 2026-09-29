@@ -1,0 +1,1481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<!-- VIEWER:START -->
+<title>Supercade Builder</title>
+<meta name="description" content="Build your own Supercade arcade cabinet: a 3D builder with plans, parts lists and cut files for cardboard, plastic or wood.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  /* One deliberate look: a workshop table under studio light, with a
+     self-healing cutting mat as the floor. Colours are explicit, so the page
+     reads the same in either host theme. */
+  :root {
+    color-scheme: light;
+    --scene: #dfe3dd;
+    --paper: #fbfcf9;
+    --paper-2: #f1f4ef;
+    --ink: #17201b;
+    --muted: #5e6c64;
+    --rule: #d5dcd6;
+    --mat: #2f6f5a;
+    --accent: #d8342a;
+    --accent-ink: #ffffff;
+    --good: #2f7d4f;
+    --warn: #b7791f;
+    --shadow: 0 1px 2px rgba(23, 32, 27, .08), 0 8px 24px rgba(23, 32, 27, .10);
+    --display: "Bungee", "Arial Black", Impact, sans-serif;
+    --body: "Instrument Sans", "Segoe UI", system-ui, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--scene);
+    color: var(--ink);
+    font: 14px/1.45 var(--body);
+    overflow: hidden;
+  }
+  #stage { position: fixed; inset: 0; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #stage canvas.dragging { cursor: grabbing; }
+
+  .panel {
+    position: fixed;
+    top: calc(16px + env(safe-area-inset-top, 0px));
+    left: 16px;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .panel header { position: relative; padding: 16px 18px 12px; border-bottom: 1px solid var(--rule); }
+  .collapse {
+    position: absolute; top: 12px; right: 12px;
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+    display: grid; place-items: center; cursor: pointer; padding: 0;
+  }
+  .collapse:hover { border-color: var(--ink); }
+  .collapse svg { transition: transform .2s; }
+  /* collapsed: just the header, so the model gets the whole window */
+  .panel.collapsed { bottom: auto; }
+  .panel.collapsed header { border-bottom: 0; }
+  .panel.collapsed .scroll, .panel.collapsed .tag { display: none; }
+  .panel.collapsed .collapse svg { transform: rotate(180deg); }
+  .panel.collapsed ~ .hint { left: 16px; }
+  .brand {
+    margin: 0;
+    font: 400 26px/1 var(--display);
+    letter-spacing: .02em;
+    color: var(--ink);
+  }
+  .brand span { color: var(--accent); }
+  .brand button { all: unset; cursor: pointer; }
+  .brand button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .by { display: inline-block; margin-top: 6px; font: 500 11px/1 var(--mono); letter-spacing: .04em; color: var(--muted); text-decoration: none; }
+  .by:hover { color: var(--accent); }
+  .panel.collapsed .by { margin-top: 4px; }
+  .tag { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .tag a { color: var(--accent); text-underline-offset: 2px; }
+  .scroll { overflow-y: auto; padding: 6px 18px 18px; display: grid; gap: 16px; }
+  .group { display: grid; gap: 8px; }
+  .label {
+    font: 500 11px/1 var(--mono);
+    text-transform: uppercase;
+    letter-spacing: .09em;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .seg { display: flex; background: var(--paper-2); border: 1px solid var(--rule); border-radius: 10px; padding: 3px; gap: 3px; }
+  .seg button {
+    flex: 1;
+    border: 0;
+    background: transparent;
+    border-radius: 7px;
+    padding: 8px 6px;
+    font: 600 13px/1 var(--body);
+    color: var(--ink);
+    cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] { background: var(--ink); color: var(--paper); }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    border: 1px solid var(--rule);
+    background: var(--paper);
+    border-radius: 999px;
+    padding: 6px 11px;
+    font: 500 13px/1 var(--body);
+    color: var(--ink);
+    cursor: pointer;
+    display: inline-flex;
+    gap: 6px;
+    align-items: baseline;
+  }
+  .chip small { font: 400 11px/1 var(--mono); color: var(--muted); }
+  .chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: var(--paper); }
+  .chip[aria-pressed="true"] small { color: #b8c4bd; }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .swatches { display: flex; flex-wrap: wrap; gap: 8px; }
+  .swatch {
+    width: 30px; height: 30px; border-radius: 50%;
+    border: 2px solid var(--paper);
+    box-shadow: 0 0 0 1px var(--rule);
+    cursor: pointer;
+    padding: 0;
+  }
+  .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+  .swatches[data-off="true"] { opacity: .35; }
+  .row { display: flex; align-items: center; gap: 10px; }
+  .row[hidden], .group[hidden] { display: none; }
+  .row input[type="range"] { flex: 1; accent-color: var(--accent); }
+  .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
+  .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+
+  .dims { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--rule); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .dims div { background: var(--paper); padding: 8px 10px; }
+  .dims dt { font: 500 10px/1.2 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .dims dd { margin: 3px 0 0; font: 500 15px/1.2 var(--mono); font-variant-numeric: tabular-nums; }
+  .fit { display: grid; gap: 6px; }
+  .fit p { margin: 0; display: flex; justify-content: space-between; gap: 8px; font-size: 13px; }
+  .pill { font: 500 11px/1 var(--mono); padding: 4px 7px; border-radius: 999px; white-space: nowrap; }
+  .pill.good { background: #e3f1e8; color: var(--good); }
+  .pill.warn { background: #f8ecd6; color: var(--warn); }
+
+  .parts { list-style: none; margin: 0; padding: 0; border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+  .parts li {
+    display: grid;
+    grid-template-columns: 38px 1fr auto;
+    gap: 8px;
+    align-items: baseline;
+    padding: 7px 10px;
+    border-top: 1px solid var(--rule);
+    font-size: 13px;
+    cursor: default;
+  }
+  .parts li:first-child { border-top: 0; }
+  .parts li:hover, .parts li.hot { background: #fff4d6; }
+  .parts b { font: 500 12px/1 var(--mono); color: var(--accent); }
+  .parts span.sz { font: 400 12px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+
+  .make-head { margin: 0; font-size: 13px; color: var(--muted); }
+  .make-head b { color: var(--ink); font-weight: 600; }
+  .files { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .files a {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    padding: 8px 10px; border: 1px solid var(--rule); border-radius: 9px;
+    color: var(--ink); text-decoration: none; font-size: 13px; background: var(--paper);
+  }
+  .files a:hover { border-color: var(--ink); }
+  .files a small { font: 500 11px/1 var(--mono); color: var(--accent); }
+  details.make { border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); }
+  details.make summary { cursor: pointer; padding: 9px 10px; font-weight: 600; font-size: 13px; }
+  details.make summary small { font: 400 11px/1 var(--mono); color: var(--muted); margin-left: 6px; }
+  details.make .parts { border: 0; border-top: 1px solid var(--rule); border-radius: 0 0 10px 10px; }
+  details.make .parts li { grid-template-columns: 38px 1fr auto; }
+  .parts .qty { font: 400 11px/1 var(--mono); color: var(--muted); }
+  .buy { border-top: 1px solid var(--rule); padding: 8px 10px 10px; display: grid; gap: 8px; }
+  .buy h4 { margin: 4px 0 0; font: 500 10px/1.2 var(--mono); letter-spacing: .08em; color: var(--muted); }
+  .buy p { margin: 0; font-size: 13px; }
+  .buy p span { display: block; color: var(--muted); font-size: 12px; }
+
+  .hint {
+    position: fixed;
+    right: 16px;
+    left: 352px;                /* clear of the side panel */
+    width: fit-content;
+    margin-left: auto;
+    bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+    font: 400 12px/1.4 var(--mono);
+    color: var(--muted);
+    background: rgba(251, 252, 249, .85);
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  /* The controls hint shrinks to a "?" once you start moving. Shrinking: the
+     text fades, then the box closes. Growing (hover): the box opens, then the
+     text fades in. */
+  .hint {
+    display: flex; align-items: center; gap: 8px;
+    overflow: hidden; max-width: 720px; max-height: 90px;
+    transition: max-width .45s cubic-bezier(.2,.8,.2,1), max-height .45s cubic-bezier(.2,.8,.2,1),
+                padding .45s cubic-bezier(.2,.8,.2,1), border-radius .45s;
+  }
+  .hint .q {
+    flex: none; width: 18px; height: 18px; border-radius: 50%;
+    border: 1.5px solid currentColor; display: grid; place-items: center;
+    font: 600 11px/1 var(--body);
+  }
+  .hint .full { transition: opacity .25s .2s; }
+  .hint.mini {
+    cursor: help; max-width: 34px; max-height: 34px; padding: 7px; border-radius: 999px;
+    transition-delay: .15s;
+  }
+  .hint.mini .full { opacity: 0; transition: opacity .15s; }
+  .hint.mini:hover, .hint.mini:focus {
+    max-width: 720px; max-height: 90px; padding: 6px 10px; border-radius: 8px; transition-delay: 0s;
+  }
+  .hint.mini:hover .full, .hint.mini:focus .full { opacity: 1; transition: opacity .25s .2s; }
+  @media (prefers-reduced-motion: reduce) { .hint, .hint .full { transition: none !important; } }
+  .tip {
+    position: fixed;
+    pointer-events: none;
+    background: var(--ink);
+    color: var(--paper);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.35;
+    max-width: 240px;
+    transform: translate(12px, 12px);
+    box-shadow: var(--shadow);
+  }
+  .tip b { font: 500 12px/1 var(--mono); color: #ffb3ad; margin-right: 6px; }
+  .tip .m { font-family: var(--mono); color: #b8c4bd; }
+  #labels { position: fixed; inset: 0; pointer-events: none; }
+  .tag3d {
+    position: absolute;
+    transform: translate(-50%, -50%);
+    font: 500 11px/1 var(--mono);
+    background: var(--paper);
+    color: var(--ink);
+    border: 1px solid var(--ink);
+    border-radius: 5px;
+    padding: 3px 5px;
+    white-space: nowrap;
+    opacity: 0;                 /* hidden until the first frame places it */
+    transition: opacity .2s;
+  }
+  .tag3d.person { border-color: var(--mat); color: var(--mat); }
+
+  @media (max-width: 720px) {
+    .panel {
+      top: auto;
+      left: 0; right: 0;
+      bottom: 0;
+      width: auto;
+      max-height: 46%;
+      border-radius: 14px 14px 0 0;
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    .panel header { padding: 12px 16px 8px; }
+    .brand { font-size: 20px; }
+    .tag { display: none; }
+    .scroll { padding-inline: 16px; }
+    .hint { display: none; }
+    .panel.collapsed { bottom: 0; }
+    .collapse svg { transform: rotate(-90deg); }
+    .panel.collapsed .collapse svg { transform: rotate(90deg); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .tag3d { transition: none; }
+  }
+</style>
+
+<div id="stage" aria-label="3D view of the Supercade arcade cabinet"></div>
+<div id="labels" aria-hidden="true"></div>
+<div class="tip" id="tip" hidden></div>
+
+<aside class="panel">
+  <header>
+    <button type="button" class="collapse" id="collapse" aria-expanded="true" aria-controls="panelBody" title="Hide the panel">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M9 2 4 7l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h1 class="brand"><button type="button" id="brandBtn" title="Hide or show the panel">SUPER<span>CADE</span></button></h1>
+    <a class="by" href="https://www.sprlbs.com" target="_blank" rel="noopener">by Super Labs Inc.</a>
+    <p class="tag">Pick a size and a material, pull it apart, check it against real people, then download the plans and cut files. <a href="https://www.sprlbs.com/lab/supercade">About Supercade</a></p>
+  </header>
+  <div class="scroll" id="panelBody">
+    <section class="group">
+      <div class="label">Size</div>
+      <div class="seg" id="size"></div>
+      <div class="row" id="tableRow" hidden>
+        <label for="tableH" class="label" style="margin:0">Table</label>
+        <input type="range" id="tableH" min="16" max="36" step="1" value="28">
+        <output id="tableOut" class="label" style="margin:0; min-width: 44px; text-align: right"></output>
+      </div>
+    </section>
+
+    <section class="group">
+      <div class="label">View</div>
+      <div class="seg" id="view">
+        <button type="button" data-v="assembled">Built</button>
+        <button type="button" data-v="exploded">Exploded</button>
+        <button type="button" data-v="flat">Flat-pack</button>
+      </div>
+      <div class="row">
+        <label for="spread" class="label" style="margin:0">Spread</label>
+        <input type="range" id="spread" min="0" max="1" step="0.01" value="0.6">
+      </div>
+      <label class="toggle"><input type="checkbox" id="xray"> X-ray: hovered part turns see-through</label>
+    </section>
+
+    <section class="group">
+      <div class="label">People for scale</div>
+      <div class="chips" id="people"></div>
+      <div class="fit" id="fit"></div>
+    </section>
+
+    <section class="group">
+      <div class="label">Finish</div>
+      <div class="chips" id="finish"></div>
+      <div class="swatches" id="paint"></div>
+      <label class="toggle"><input type="checkbox" id="art" checked> Side art stripes</label>
+    </section>
+
+    <section class="group" id="build">
+      <div class="label">Build it</div>
+      <p class="make-head" id="makeHead"></p>
+      <ul class="files" id="files"></ul>
+      <details class="make">
+        <summary>Cut list <small id="cutCount"></small></summary>
+        <ul class="parts" id="cutList"></ul>
+      </details>
+      <details class="make">
+        <summary>Shopping list</summary>
+        <div id="buyList"></div>
+      </details>
+    </section>
+
+    <section class="group">
+      <div class="label">Dimensions</div>
+      <div class="seg" id="units">
+        <button type="button" data-u="in">Inches</button>
+        <button type="button" data-u="cm">Centimetres</button>
+      </div>
+      <dl class="dims" id="dims"></dl>
+    </section>
+
+    <section class="group">
+      <div class="label">Parts</div>
+      <ul class="parts" id="parts"></ul>
+    </section>
+  </div>
+</aside>
+<div class="hint" id="hint" tabindex="0" aria-label="Controls"><span class="q" aria-hidden="true">?</span><span class="full">Drag to orbit · scroll to zoom · right-drag to pan · WASD to move · Q/E up/down · arrows to turn · 1/2/3 size · R to reset</span></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/GLTFLoader.js"></script>
+<script src="data.js"></script>
+<script src="people.js"></script>
+<script>
+(function () {
+  "use strict";
+  const DATA = window.SUPERCADE_DATA;
+  const IN = 0.0254;                      // metres per inch
+  const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ------------------------------------------------------------------ state
+  const PEOPLE = [
+    { id: "adult", name: "Adult", cm: 170, head: 0.065 },
+    { id: "kid8", name: "Kid, 8", cm: 128, head: 0.078 },
+    { id: "kid5", name: "Kid, 5", cm: 110, head: 0.088 },
+  ];
+  // Cardboard is only for the bartop; the full-size cabinets are plastic or wood.
+  const FINISHES = [
+    { id: "cardboard", name: "Cardboard", only: "table" },
+    { id: "plastic", name: "Plastic" },
+    { id: "birch", name: "Birch ply" },
+    { id: "walnut", name: "Walnut" },
+    { id: "paint", name: "Painted" },
+  ];
+  const PAINTS = [
+    ["Arcade red", "#d7263d"], ["Cobalt", "#2346c8"], ["Sunshine", "#f4bf2a"],
+    ["Midnight", "#1d1d33"], ["Mint", "#39c28b"], ["Bubblegum", "#ff6fb5"], ["Chalk", "#efefe9"],
+  ];
+  const state = {
+    build: "bartop", view: "assembled", spread: 0.6, table: 28,
+    people: { adult: true, kid8: true, kid5: false },
+    finish: "cardboard", paint: "#d7263d", art: true, units: "in", xray: false,
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem("supercade-viewer") || "{}");
+    Object.assign(state, saved, { view: "assembled" });
+  } catch (e) { /* storage unavailable: defaults are fine */ }
+  function save() {
+    try { localStorage.setItem("supercade-viewer", JSON.stringify(state)); } catch (e) { /* ignore */ }
+  }
+  const build = () => DATA.builds.find(b => b.id === state.build) || DATA.builds[0];
+  const finishes = b => FINISHES.filter(f => f.only !== "table" || b.table);
+  const tableH = b => b.table ? state.table : 0;           // inches
+
+  // ------------------------------------------------------------------ units
+  function frac(v) {
+    const e = Math.round(v * 8), w = Math.floor(e / 8), r = e % 8;
+    if (!r) return w + "″";
+    const g = r % 4 === 0 ? 4 : r % 2 === 0 ? 2 : 1;
+    const f = (r / g) + "/" + (8 / g);
+    return (w ? w + " " : "") + f + "″";
+  }
+  const fmt = v => state.units === "in" ? frac(v) : (v * 2.54).toFixed(1) + " cm";
+  const fmtPair = (a, b) => state.units === "in"
+    ? frac(a).replace("″", "") + " × " + frac(b)
+    : (a * 2.54).toFixed(1) + " × " + (b * 2.54).toFixed(1) + " cm";
+  const ftIn = cm => { const i = Math.round(cm / 2.54); return Math.floor(i / 12) + "′" + (i % 12) + "″"; };
+
+  // ------------------------------------------------------------------ three setup
+  const stage = document.getElementById("stage");
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  stage.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color("#dfe3dd");
+  scene.fog = new THREE.Fog("#dfe3dd", 9, 22);
+
+  const camera = new THREE.PerspectiveCamera(35, 1, 0.05, 60);
+  const controls = new THREE.OrbitControls(camera, renderer.domElement);
+  controls.enableDamping = true;
+  controls.dampingFactor = 0.08;
+  controls.maxPolarAngle = Math.PI * 0.495;
+  controls.minDistance = 0.4;
+  controls.maxDistance = 14;
+
+  scene.add(new THREE.HemisphereLight(0xffffff, 0x8a9a90, 0.75));
+  const sun = new THREE.DirectionalLight(0xffffff, 0.85);
+  sun.position.set(2.5, 5, 3.5);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  Object.assign(sun.shadow.camera, { left: -3.5, right: 3.5, top: 3.5, bottom: -3.5, near: 0.5, far: 14 });
+  sun.shadow.bias = -0.0004;
+  scene.add(sun);
+  const fill = new THREE.DirectionalLight(0xfff1e0, 0.25);
+  fill.position.set(-3, 2, -2);
+  scene.add(fill);
+
+  // ------------------------------------------------------------------ canvas textures
+  function canvasTex(w, h, draw, repeat) {
+    const c = document.createElement("canvas");
+    c.width = w; c.height = h;
+    draw(c.getContext("2d"), w, h);
+    const t = new THREE.CanvasTexture(c);
+    t.encoding = THREE.sRGBEncoding;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    if (repeat) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+    return t;
+  }
+  // tiny value noise for wood grain
+  function noise2(seed) {
+    const p = new Float32Array(64 * 64);
+    let s = seed;
+    for (let i = 0; i < p.length; i++) { s = (s * 16807) % 2147483647; p[i] = s / 2147483647; }
+    const sm = t => t * t * (3 - 2 * t);
+    return (x, y) => {
+      const xi = Math.floor(x), yi = Math.floor(y), xf = sm(x - xi), yf = sm(y - yi);
+      const g = (a, b) => p[((a & 63) + (b & 63) * 64)];
+      const a = g(xi, yi) + (g(xi + 1, yi) - g(xi, yi)) * xf;
+      const b = g(xi, yi + 1) + (g(xi + 1, yi + 1) - g(xi, yi + 1)) * xf;
+      return a + (b - a) * yf;
+    };
+  }
+  function woodTex(light, dark, rings, seed) {
+    const n = noise2(seed);
+    const L = new THREE.Color(light), Dk = new THREE.Color(dark);
+    return canvasTex(512, 512, (g, w, h) => {
+      const img = g.createImageData(w, h);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          // long streaks running along the panel, gently wandering
+          const warp = n(x / 70, y / 160) * 2.4 + n(x / 14, y / 70) * 0.3;
+          let v = Math.sin((x / w * rings + warp) * Math.PI * 2) * 0.5 + 0.5;
+          v = Math.pow(v, 3) * 0.7 + n(x / 2, y / 90) * 0.3;
+          const i = (y * w + x) * 4;
+          img.data[i] = (L.r + (Dk.r - L.r) * v) * 255;
+          img.data[i + 1] = (L.g + (Dk.g - L.g) * v) * 255;
+          img.data[i + 2] = (L.b + (Dk.b - L.b) * v) * 255;
+          img.data[i + 3] = 255;
+        }
+      }
+      g.putImageData(img, 0, 0);
+    }, true);
+  }
+  const TEX = {
+    cardboard: canvasTex(512, 512, (g, w, h) => {
+      g.fillStyle = "#b88a57"; g.fillRect(0, 0, w, h);
+      for (let x = 0; x < w; x += 8) {          // flutes showing through the liner
+        g.fillStyle = "rgba(255,235,200,0.10)"; g.fillRect(x, 0, 3, h);
+        g.fillStyle = "rgba(90,55,20,0.06)"; g.fillRect(x + 4, 0, 2, h);
+      }
+      for (let i = 0; i < 5000; i++) {
+        g.fillStyle = Math.random() < 0.5 ? "rgba(70,40,10,0.08)" : "rgba(255,240,210,0.08)";
+        g.fillRect(Math.random() * w, Math.random() * h, 1 + Math.random() * 2, 1);
+      }
+    }, true),
+    birch: woodTex("#efdcb6", "#cfae7f", 16, 11),
+    walnut: woodTex("#6a4428", "#452a16", 14, 23),
+    mat: canvasTex(1024, 1024, (g, w, h) => {
+      g.fillStyle = "#2f6f5a"; g.fillRect(0, 0, w, h);
+      const step = w / 24;                       // tile = 24″, 1″ grid
+      for (let i = 0; i <= 24; i++) {
+        const major = i % 6 === 0;
+        g.fillStyle = major ? "rgba(236,246,240,0.55)" : "rgba(236,246,240,0.22)";
+        const lw = major ? 2 : 1;
+        g.fillRect(i * step - lw / 2, 0, lw, h);
+        g.fillRect(0, i * step - lw / 2, w, lw);
+      }
+      g.strokeStyle = "rgba(236,246,240,0.25)";
+      g.beginPath(); g.moveTo(0, h); g.lineTo(w, 0); g.stroke();
+    }, true),
+  };
+  TEX.mat.repeat.set(12, 12);
+
+  // floor: 6 m x 6 m cutting mat, 24″ texture tile
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(24 * 24 * IN, 24 * 24 * IN),
+    new THREE.MeshStandardMaterial({ map: TEX.mat, roughness: 0.95 })
+  );
+  floor.rotation.x = -Math.PI / 2;
+  floor.receiveShadow = true;
+  scene.add(floor);
+
+  // a plain table for the bartop to stand on (hidden for the floor-standing cabinets)
+  const table = new THREE.Group();
+  scene.add(table);
+  const tableMat = new THREE.MeshStandardMaterial({ map: TEX.walnut, roughness: 0.6 });
+  function buildTable(b, sz) {
+    table.clear();
+    if (!b.table) return;
+    const H = tableH(b) * IN, top = 1.2 * IN;
+    const w = Math.max(30 * IN, sz.x + 14 * IN), d = Math.max(24 * IN, sz.z + 10 * IN);
+    const zFront = sz.z + 4 * IN;                         // cabinet sits 4" back from the front edge
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, top, d), tableMat);
+    slab.position.set(0, H - top / 2, zFront - d / 2);
+    table.add(slab);
+    const lw = 1.8 * IN;
+    for (const sx of [-1, 1]) for (const sz2 of [0, 1]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(lw, H - top, lw), tableMat);
+      leg.position.set(sx * (w / 2 - lw), (H - top) / 2, zFront - lw - sz2 * (d - 2 * lw));
+      table.add(leg);
+    }
+    table.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  }
+
+  // ------------------------------------------------------------------ screen (attract mode)
+  const screenCanvas = document.createElement("canvas");
+  screenCanvas.width = 320; screenCanvas.height = 180;
+  const screenTex = new THREE.CanvasTexture(screenCanvas);
+  screenTex.encoding = THREE.sRGBEncoding;
+  const stars = Array.from({ length: 70 }, () => [Math.random() * 320, Math.random() * 180, 0.4 + Math.random() * 1.6]);
+  function drawScreen(time) {
+    const g = screenCanvas.getContext("2d");
+    g.fillStyle = "#07061a"; g.fillRect(0, 0, 320, 180);
+    for (const s of stars) {
+      s[0] -= s[2] * 0.8; if (s[0] < 0) s[0] += 320;
+      g.fillStyle = s[2] > 1.4 ? "#ffffff" : "#6f7bd6";
+      g.fillRect(s[0] | 0, s[1] | 0, s[2] > 1.2 ? 2 : 1, s[2] > 1.2 ? 2 : 1);
+    }
+    g.textAlign = "center";
+    g.font = "30px Bungee, Impact, sans-serif";
+    g.fillStyle = "#ff3b6b"; g.fillText("SUPERCADE", 162, 86);
+    g.fillStyle = "#ffd23f"; g.fillText("SUPERCADE", 160, 84);
+    if (Math.floor(time / 600) % 2 === 0) {
+      g.font = "13px 'IBM Plex Mono', monospace";
+      g.fillStyle = "#ffffff"; g.fillText("INSERT COIN", 160, 128);
+    }
+    g.font = "10px 'IBM Plex Mono', monospace";
+    g.fillStyle = "#8ee6b8"; g.fillText("1UP 000000   HI 031337", 160, 20);
+    screenTex.needsUpdate = true;
+  }
+
+  // ------------------------------------------------------------------ materials
+  function thickness(b) {
+    if (state.finish === "cardboard") return 0.28;       // double-wall board
+    if (state.finish === "plastic") return b.scale >= 1 ? 0.4 : 0.24;   // 10 mm / 6 mm PVC foam board
+    return b.scale >= 1 ? 0.5 : 0.25;                    // 1/2″ ply, 1/4″ at half scale
+  }
+  function makeMaterials(b) {
+    const f = state.finish;
+    const std = o => new THREE.MeshStandardMaterial(Object.assign({ roughness: 0.85, metalness: 0 }, o));
+    let face, edge;
+    if (f === "cardboard") {
+      face = std({ map: TEX.cardboard, roughness: 0.97 });
+      edge = std({ color: "#9c7244", roughness: 1 });
+    } else if (f === "birch") {
+      face = std({ map: TEX.birch, roughness: 0.7 });
+      edge = std({ color: "#e2c795", roughness: 0.8 });
+    } else if (f === "plastic") {
+      face = std({ color: "#ecece6", roughness: 0.4 });
+      edge = std({ color: "#d9d9d2", roughness: 0.5 });
+    } else if (f === "walnut") {
+      face = std({ map: TEX.walnut, roughness: 0.55 });
+      edge = std({ color: "#4a2e19", roughness: 0.7 });
+    } else {
+      face = std({ color: state.paint, roughness: 0.45 });
+      edge = std({ color: new THREE.Color(state.paint).multiplyScalar(0.8), roughness: 0.5 });
+    }
+    for (const m of [face, edge]) if (m.map) { m.map.repeat.set(1 / 0.6, 1 / 0.6); }
+    return { face, edge };
+  }
+  function sideArtTexture(b, dMax, hMax, mirror) {
+    // Painted side with racing stripes that follow the cabinet's own slope.
+    const base = state.finish === "paint" ? state.paint : state.finish === "plastic" ? "#ecece6" : null;
+    return canvasTex(512, 1024, (g, w, h) => {
+      const sx = w / dMax, sy = h / hMax;
+      const P = k => [b.side[k][1] * sx, h - b.side[k][0] * sy];
+      if (base) { g.fillStyle = base; g.fillRect(0, 0, w, h); }
+      else {
+        const img = (state.finish === "cardboard" ? TEX.cardboard : state.finish === "birch" ? TEX.birch : TEX.walnut).image;
+        for (let y = 0; y < h; y += 256) for (let x = 0; x < w; x += 256) g.drawImage(img, x, y, 256, 256);
+      }
+      const light = base && new THREE.Color(base).getHSL({}).l > 0.6;
+      const cols = light ? ["#1d1d33", "#d7263d", "#2346c8"] : ["#ffffff", "#ffd23f", "#ff3b6b"];
+      // the floor-level slope at the front: the kick panel, or the bartop's front base
+      const kick = b.order.includes("H") ? ["G", "H"] : ["F", "G"];
+      const [Gx, Gy] = P(kick[0]), [Hx, Hy] = P(kick[1]);
+      // three stripes parallel to the kick slope, from the floor up the back
+      for (let i = 0; i < 3; i++) {
+        const off = (i * 0.045 + 0.05) * h;
+        g.fillStyle = cols[i];
+        g.beginPath();
+        g.moveTo(0, Hy - off);
+        g.lineTo(Gx - 6, Gy - off);
+        g.lineTo(Gx - 6, Gy - off - 0.025 * h);
+        g.lineTo(0, Hy - off - 0.025 * h);
+        g.closePath(); g.fill();
+      }
+      g.save();
+      // the right-hand panel shows this texture from behind, so flip its lettering
+      g.translate(w * 0.18, h * 0.42);
+      if (mirror) g.scale(-1, 1);
+      g.rotate(mirror ? Math.PI / 2 : -Math.PI / 2);
+      g.font = `${Math.round(w * 0.13)}px Bungee, Impact, sans-serif`;
+      g.fillStyle = cols[1];
+      g.fillText("SUPERCADE", 0, 0);
+      g.restore();
+    });
+  }
+
+  // ------------------------------------------------------------------ cabinet
+  let cabinet = null;     // { group, parts[], people[], bounds }
+  const peopleGroup = new THREE.Group();
+  scene.add(peopleGroup);
+
+  // A panel is a face line a -> b in the side profile (h, d) plus the normal of
+  // its visible face; its thickness sits behind that face.
+  function panelFrame(p) {
+    const pa = p.a, pc = p.b;
+    const dh = pc[0] - pa[0], dd = pc[1] - pa[1], L = Math.hypot(dh, dd);
+    const v = new THREE.Vector3(0, dh / L, dd / L);
+    const outW = new THREE.Vector3(0, p.out[0], p.out[1]).normalize();
+    const X = new THREE.Vector3(1, 0, 0);
+    const Z = new THREE.Vector3().crossVectors(X, v);
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, v, Z));
+    const mid = new THREE.Vector3(0, (pa[0] + pc[0]) / 2 * IN, (pa[1] + pc[1]) / 2 * IN);
+    const out = Z.dot(outW) > 0 ? 1 : -1;               // local z sign of the visible face
+    return { L, v, nIn: outW.clone().negate(), outW, q, mid, out };
+  }
+
+  function addPart(list, o) {
+    o.mesh.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; m.userData.part = o; } });
+    list.push(o);
+    return o;
+  }
+
+  function buildCabinet() {
+    const b = build();
+    const t = thickness(b);
+    const W = b.innerWidth;
+    const { face, edge } = makeMaterials(b);
+    const group = new THREE.Group();
+    const parts = [];
+
+    // --- P1 side panels: the CAD profile, extruded
+    const pts = b.order.split("").map(k => new THREE.Vector2(b.side[k][1] * IN, b.side[k][0] * IN));
+    const shape = new THREE.Shape(pts);
+    const dMax = Math.max(...b.order.split("").map(k => b.side[k][1]));
+    const hMax = Math.max(...b.order.split("").map(k => b.side[k][0]));
+    for (const s of [-1, 1]) {
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: t * IN, bevelEnabled: false });
+      geo.translate(-dMax / 2 * IN, -hMax / 2 * IN, -t / 2 * IN);
+      let capMat = face.clone();
+      if (state.art) {
+        const art = sideArtTexture(b, dMax, hMax, s > 0);
+        art.repeat.set(1 / (dMax * IN), 1 / (hMax * IN));
+        capMat = new THREE.MeshStandardMaterial({ map: art, roughness: state.finish === "paint" ? 0.45 : 0.8 });
+      }
+      const mesh = new THREE.Mesh(geo, [capMat, edge.clone()]);
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -Math.PI / 2, 0));
+      // after rotating, local +z points to world -x; the outer face is the one facing away from the centre
+      const out = s > 0 ? -1 : 1;
+      addPart(parts, {
+        id: "P1", name: s < 0 ? "Side panel (left)" : "Side panel (right)",
+        size: [hMax, dMax, t], mesh, out,
+        home: { pos: new THREE.Vector3(s * (W / 2 + t / 2) * IN, hMax / 2 * IN, dMax / 2 * IN), q },
+        dir: new THREE.Vector3(s, 0, 0), dist: 1,
+      });
+    }
+
+    // --- P2-P9 outer panels and the P4a-c screen recess behind the front frame
+    const frames = {};
+    const recessMat = new THREE.MeshStandardMaterial({ color: "#141417", roughness: 0.92 });
+    // The recess ceiling and floor are drawn to the frame's outer face; stop them
+    // at its inner face instead so they don't poke through the frame.
+    function behindFrame(p) {
+      const F = b.panels.find(q => q.id === "P4");
+      if (!p.recess || p.id === "P4b" || !F) return p;
+      const [fh, fd] = F.a, [gh, gd] = F.b, fl = Math.hypot(gh - fh, gd - fd);
+      const on = [-(gd - fd) / fl, (gh - fh) / fl];            // a frame normal (h, d)
+      const n = on[0] * F.out[0] + on[1] * F.out[1] > 0 ? on : [-on[0], -on[1]];
+      const inner = [fh - n[0] * t, fd - n[1] * t];            // a point on the frame's inner face
+      const [ah, ad] = p.a, [bh, bd] = p.b, L = Math.hypot(bh - ah, bd - ad);
+      const u = [(bh - ah) / L, (bd - ad) / L];
+      const into = u[0] * n[0] + u[1] * n[1];                  // how fast the panel runs into the frame
+      if (into <= 0) return p;
+      const depth = c => (c[0] - inner[0]) * n[0] + (c[1] - inner[1]) * n[1];
+      const back = [bh - p.out[0] * t, bd - p.out[1] * t];    // the panel's hidden corner at that end
+      const cut = Math.max(depth(p.b), depth(back)) / into;
+      if (cut <= 0) return p;
+      return Object.assign({}, p, { b: [bh - u[0] * cut, bd - u[1] * cut] });
+    }
+    for (const p0 of b.panels) {
+      const p = behindFrame(p0);
+      const fr = panelFrame(p);
+      frames[p.id] = fr;
+      const Wm = W * IN, Lm = fr.L * IN;
+      const sh = new THREE.Shape();
+      sh.moveTo(-Wm / 2, -Lm / 2); sh.lineTo(Wm / 2, -Lm / 2); sh.lineTo(Wm / 2, Lm / 2); sh.lineTo(-Wm / 2, Lm / 2); sh.closePath();
+      for (const hole of p.holes || []) {
+        const path = new THREE.Path();
+        if (hole.rect) {
+          const [x0, s0, x1, s1] = hole.rect.map(v => v * IN);
+          path.moveTo(x0 - Wm / 2, s0 - Lm / 2); path.lineTo(x1 - Wm / 2, s0 - Lm / 2);
+          path.lineTo(x1 - Wm / 2, s1 - Lm / 2); path.lineTo(x0 - Wm / 2, s1 - Lm / 2); path.closePath();
+        } else if (hole.oval) {
+          const [cx, cs, ow, oh] = hole.oval.map(v => v * IN);
+          path.absellipse(cx - Wm / 2, cs - Lm / 2, ow / 2, oh / 2, 0, Math.PI * 2, false, 0);
+        }
+        sh.holes.push(path);
+      }
+      const geo = new THREE.ExtrudeGeometry(sh, { depth: t * IN, bevelEnabled: false, curveSegments: 24 });
+      geo.translate(0, 0, -t / 2 * IN);
+      const mats = p.recess ? [recessMat.clone(), recessMat.clone()] : [face.clone(), edge.clone()];
+      const mesh = new THREE.Mesh(geo, mats);
+      const dir = p.explode ? new THREE.Vector3(0, p.explode[0], p.explode[1]).normalize() : fr.outW.clone();
+      const home = { pos: fr.mid.clone().addScaledVector(fr.nIn, t / 2 * IN), q: fr.q };
+      addPart(parts, {
+        id: p.id, name: p.name, size: [fr.L, W, t], mesh, out: fr.out, home,
+        // a panel facing straight down only drops part way, or it would go through the mat
+        dir, dist: p.recess ? 0.6 : p.floor ? (b.table ? 0.45 : 2.2) : p.id === "P4" ? 1.35 : dir.y < -0.8 ? 0.4 : 1,
+      });
+      // doors and hatches: the cut-out pieces, sitting in their openings
+      for (const d of p.doors || []) {
+        const [x0, s0, x1, s1] = d.rect;
+        const dm = new THREE.Mesh(new THREE.BoxGeometry((x1 - x0) * IN, (s1 - s0) * IN, t * IN), [edge.clone(), edge.clone(), edge.clone(), edge.clone(), face.clone(), face.clone()]);
+        const local = new THREE.Vector3(((x0 + x1) / 2 - W / 2) * IN, ((s0 + s1) / 2 - fr.L / 2) * IN, 0).applyQuaternion(fr.q);
+        addPart(parts, {
+          id: d.id, name: d.name, size: [s1 - s0, x1 - x0, t], mesh: dm, out: fr.out,
+          home: { pos: home.pos.clone().add(local), q: fr.q }, dir: fr.outW.clone(), dist: 1.5,
+        });
+      }
+    }
+
+    // --- P12 control plate on top of the deck, with the real control layout
+    const deck = frames.P5, cp = b.controls;
+    {
+      const pt = 0.2;                                       // 5 mm plate
+      const Wm = W * IN, Lm = deck.L * IN;
+      const geo = new THREE.BoxGeometry(Wm, Lm, pt * IN);
+      const plate = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: "#141418", roughness: 0.6 }));
+      const zTop = deck.out * pt / 2 * IN;
+      const off = (W - cp.width) / 2, offY = (deck.L - cp.height) / 2;
+      const P1c = { button: "#e53935", stick: "#e53935" }, P2c = { button: "#1e63e9", stick: "#1e63e9" };
+      for (const [x, y, dia, kind] of cp.holes) {
+        if (kind === "mount") continue;
+        const lx = (x + off - W / 2) * IN, ly = (y + offY - deck.L / 2) * IN;
+        const p2 = x > cp.width / 2;
+        let m;
+        if (kind === "stick") {
+          m = new THREE.Group();
+          const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.004, 0.004, 1.1 * IN, 12), new THREE.MeshStandardMaterial({ color: "#c9ccd1", metalness: 0.6, roughness: 0.3 }));
+          shaft.position.y = 0.55 * IN;
+          const ball = new THREE.Mesh(new THREE.SphereGeometry(0.0175, 24, 16), new THREE.MeshStandardMaterial({ color: p2 ? P2c.stick : P1c.stick, roughness: 0.25 }));
+          ball.position.y = 1.2 * IN;
+          const dust = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.002, 24), new THREE.MeshStandardMaterial({ color: "#222", roughness: 0.8 }));
+          m.add(shaft, ball, dust);
+        } else {
+          const colour = kind === "button" ? (p2 ? P2c.button : P1c.button)
+            : kind === "start" ? "#f5f5f0" : kind === "coin" ? "#ffd23f" : "#2fbf71";
+          m = new THREE.Group();
+          const r = dia / 2000;
+          const bezel = new THREE.Mesh(new THREE.CylinderGeometry(r * 1.12, r * 1.15, 0.003, 28), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.35 }));
+          const cap = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.86, r * 0.86, 0.006, 28), new THREE.MeshStandardMaterial({ color: colour, roughness: 0.25 }));
+          cap.position.y = 0.004;
+          m.add(bezel, cap);
+        }
+        // controls are built along +y; turn them to face the plate's outer side
+        m.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, deck.out));
+        m.position.set(lx, ly, zTop);
+        plate.add(m);
+      }
+      addPart(parts, {
+        id: "P12", name: b.scale < 1 ? "Control plate (5 mm Foamex)" : "Control plate",
+        size: [deck.L, W, pt], mesh: plate, out: deck.out,
+        home: { pos: deck.mid.clone().addScaledVector(deck.nIn, -pt / 2 * IN), q: deck.q },
+        dir: deck.nIn.clone().negate(), dist: 1.4,
+      });
+    }
+
+    // --- Monitor behind the screen board's window (P4b in the recess, or the bartop's flat P4)
+    const scr = b.panels.find(p => p.screen);
+    const bez = frames[scr.id];
+    const screenOff = scr.screenAt != null ? scr.screenAt - bez.L / 2 : 0;   // window centre along the board
+    let monitorBottom = 0;
+    {
+      const [sw, shh] = b.screen;
+      const depth = b.scale < 1 ? 0.6 : 1.8, border = b.scale < 1 ? 0.35 : 0.8;
+      const mon = new THREE.Group();
+      const body = new THREE.Mesh(new THREE.BoxGeometry((sw + 2 * border) * IN, (shh + 2 * border) * IN, depth * IN),
+        new THREE.MeshStandardMaterial({ color: "#1b1c20", roughness: 0.5 }));
+      const glass = new THREE.Mesh(new THREE.PlaneGeometry(sw * IN, shh * IN), new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false }));
+      glass.position.z = bez.out * (depth / 2 * IN + 0.0005);
+      // face out, keep the picture upright and unmirrored
+      if (bez.out < 0) glass.rotation.y = Math.PI;
+      if (bez.v.y < 0) glass.rotation.z = Math.PI;
+      mon.add(body, glass);
+      const local = new THREE.Vector3(0, screenOff * IN, -bez.out * (t / 2 + depth / 2 + 0.05) * IN);
+      const pos = local.clone().applyQuaternion(bez.q).add(bez.mid.clone().addScaledVector(bez.nIn, t / 2 * IN));
+      addPart(parts, {
+        id: "—", name: b.scale < 1 ? "13.3″ portable monitor" : "27″ monitor",
+        size: [shh + 2 * border, sw + 2 * border, depth], mesh: mon, out: bez.out, noList: true,
+        home: { pos, q: bez.q }, dir: new THREE.Vector3(0, 0, 1), dist: 0.25,
+      });
+      // lowest point of the monitor, to set the screen shelf under it
+      mon.position.copy(pos); mon.quaternion.copy(bez.q); mon.updateMatrixWorld(true);
+      monitorBottom = new THREE.Box3().setFromObject(mon).min.y / IN;
+      mon.position.set(0, 0, 0); mon.quaternion.identity();
+    }
+
+    // --- P10/P11 box-beam shelves
+    const [bt, bs] = b.beam;
+    function beam(id, name, topH, dFront, depth, thick) {
+      const geo = new THREE.BoxGeometry(W * IN, thick * IN, depth * IN);
+      const mesh = new THREE.Mesh(geo, [edge.clone(), edge.clone(), face.clone(), face.clone(), edge.clone(), edge.clone()]);
+      addPart(parts, {
+        id, name, size: [depth, W, thick], mesh, out: 1,
+        home: { pos: new THREE.Vector3(0, (topH - thick / 2) * IN, (dFront - depth / 2) * IN), q: new THREE.Quaternion() },
+        dir: new THREE.Vector3(0, 0, -1), dist: 0.55, flatUp: true,
+      });
+    }
+    const S = b.side;
+    if (b.ledge) {
+      // Bartop: an L-angle glued to the back of the screen board; the monitor stands on it
+      const { width, leg, at } = b.ledge, lt = t;
+      const g = new THREE.Group();
+      const back = -bez.out;                                   // local z pointing into the cabinet
+      const upright = new THREE.Mesh(new THREE.BoxGeometry(width * IN, leg * IN, lt * IN), face.clone());
+      upright.position.set(0, (at + leg / 2 - bez.L / 2) * IN, back * (t / 2 + lt / 2) * IN);
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(width * IN, lt * IN, leg * IN), face.clone());
+      shelf.position.set(0, (at + lt / 2 - bez.L / 2) * IN, back * (t / 2 + leg / 2) * IN);
+      g.add(upright, shelf);
+      addPart(parts, {
+        id: "P10", name: "Monitor ledge", size: [leg * 2, width, lt], mesh: g, out: bez.out,
+        home: { pos: bez.mid.clone().addScaledVector(bez.nIn, t / 2 * IN), q: bez.q },
+        dir: bez.outW.clone(), dist: 0.5,
+      });
+    } else {
+      const board = scr;
+      const frontAt = h => { // back face of the screen board at height h
+        const [h1, d1] = board.a, [h2, d2] = board.b;
+        return d1 + (d2 - d1) * (h - h1) / (h2 - h1) - t - 0.05;
+      };
+      // The screen shelf spans from the back panel to the back of the screen board
+      // (the board leans back, so the top edge is the tight one); the monitor sits on it.
+      const shelfTop = monitorBottom - 0.05;
+      const shelfFront = frontAt(shelfTop);
+      const [sbt, sbs] = b.screenBeam || [bt, bs];            // the monitor's shelf is a slimmer tube
+      beam("P10", "Screen shelf", shelfTop, shelfFront, Math.min(sbt, shelfFront - t - 0.05), sbs);
+    }
+    const kickAt = h => S.H[1] + (S.G[1] - S.H[1]) * h / S.G[0] - t - 0.3;
+    if (b.shelfH > bs + 0.5) beam("P11", "Lower shelf", b.shelfH, Math.min(kickAt(b.shelfH - bs), 2 * b.scale + bt), bt, bs);
+
+    for (const p of parts) {
+      p.radius = new THREE.Box3().setFromObject(p.mesh).getBoundingSphere(new THREE.Sphere()).radius;
+      group.add(p.mesh);
+    }
+
+    // --- flat-pack layout: every part lying outer-face-up on the mat
+    const q90 = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
+    const qm90 = new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, 0, 0));
+    const items = parts.map(p => {
+      const bb = new THREE.Box3().setFromObject(new THREE.Mesh(p.mesh.geometry || new THREE.BoxGeometry()));
+      let sx, sy, sz;
+      if (p.mesh.geometry) { const s = bb.getSize(new THREE.Vector3()); [sx, sy, sz] = [s.x, s.y, s.z]; }
+      else { const s = new THREE.Box3().setFromObject(p.mesh).getSize(new THREE.Vector3()); [sx, sy, sz] = [s.x, s.y, s.z]; }
+      // shelves lie as they sit (top up); everything else lies on its face
+      return p.flatUp ? { p, sx, sy: sz, sz: sy } : { p, sx, sy, sz };
+    });
+    const gap = 0.06 * Math.max(0.6, b.scale) + 0.03;
+    const totalArea = items.reduce((a, it) => a + (it.sx + gap) * (it.sy + gap), 0);
+    const rowMax = Math.max(1.0, Math.sqrt(totalArea) * 1.35);
+    const sorted = items.slice().sort((a, c) => c.sy - a.sy);
+    let x = 0, z = 0, rowDepth = 0, maxX = 0;
+    for (const it of sorted) {
+      if (x > 0 && x + it.sx > rowMax) { x = 0; z += rowDepth + gap; rowDepth = 0; }
+      it.fx = x + it.sx / 2; it.fz = z + it.sy / 2;
+      x += it.sx + gap; maxX = Math.max(maxX, x); rowDepth = Math.max(rowDepth, it.sy);
+    }
+    const totalZ = z + rowDepth;
+    for (const it of items) {
+      const up = it.p.flatUp ? new THREE.Quaternion() : (it.p.out > 0 ? q90 : qm90);
+      const h = it.sz;
+      it.p.flat = {
+        pos: new THREE.Vector3(it.fx - maxX / 2, h / 2 + 0.001, it.fz - totalZ / 2),
+        q: up,
+      };
+    }
+
+    const size = new THREE.Vector3(W * IN + 2 * t * IN, hMax * IN, dMax * IN);
+    return { b, group, parts, size, flatExtent: new THREE.Vector2(maxX, totalZ), t };
+  }
+
+  // ------------------------------------------------------------------ people
+  // Real body meshes (CC0, Blender Studio Human Base Meshes) from people.js;
+  // until they're parsed, or if they can't be, a simple peg figure stands in.
+  const bodyGeo = {};
+  function loadBodies() {
+    const packed = window.SUPERCADE_PEOPLE || {};
+    if (!THREE.GLTFLoader) return;
+    const loader = new THREE.GLTFLoader();
+    const jobs = Object.entries(packed).map(([id, b64]) => new Promise(done => {
+      const bin = atob(b64), buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      loader.parse(buf.buffer, "", gltf => {
+        gltf.scene.traverse(o => {
+          if (o.isMesh && !bodyGeo[id]) {
+            const g = o.geometry.clone();
+            g.applyMatrix4(o.matrixWorld);
+            g.computeVertexNormals();
+            g.computeBoundingBox();
+            bodyGeo[id] = g;
+          }
+        });
+        done();
+      }, () => done());
+    }));
+    Promise.all(jobs).then(() => {
+      // The stylized male body reads as a cartoon at 8; a child-proportioned
+      // copy of the realistic adult matches the others better.
+      if (bodyGeo.adult) bodyGeo.kid8 = childFrom(bodyGeo.adult, 1.22, 0.93);
+      if (cabinet) placePeople();
+    });
+  }
+  // Grow the head (everything above the neck) about the neck, and slim the body a
+  // little; the viewer then scales the whole figure down to the child's height.
+  function childFrom(adult, headK, slim) {
+    const g = adult.clone(), pos = g.attributes.position, bb = adult.boundingBox;
+    const Hb = bb.max.y - bb.min.y, neck = bb.min.y + Hb * 0.855, blend = Hb * 0.03;
+    let nz = 0, n = 0;                                   // neck centre, front to back
+    for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getY(i) - neck) < blend) { nz += pos.getZ(i); n++; }
+    nz = n ? nz / n : 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const t = Math.min(1, Math.max(0, (y - (neck - blend)) / blend));
+      const f = t * t * (3 - 2 * t);                      // 0 on the body, 1 on the head
+      const k = 1 + (headK - 1) * f, w = slim + (1 - slim) * f;
+      pos.setXYZ(i, x * k * w, neck + (y - neck) * k, nz + (z - nz) * k * w);
+    }
+    g.computeVertexNormals();
+    g.computeBoundingBox();
+    return g;
+  }
+  const skin = new THREE.MeshStandardMaterial({ color: "#b9c3be", roughness: 0.62, metalness: 0 });
+
+  function makePerson(p) {
+    const H = p.cm / 100;
+    const geo = bodyGeo[p.id];
+    if (geo) {
+      const g = new THREE.Group();
+      const m = new THREE.Mesh(geo, skin);
+      const k = H / (geo.boundingBox.max.y - geo.boundingBox.min.y);
+      m.scale.setScalar(k);
+      m.position.y = -geo.boundingBox.min.y * k;
+      m.castShadow = true;
+      g.add(m);
+      g.userData = { H, person: p };
+      return g;
+    }
+    const g = new THREE.Group();
+    const mat = new THREE.MeshStandardMaterial({ color: "#9fb0a7", roughness: 0.75 });
+    const hr = H * p.head;
+    const cyl = (rt, rb, h, x, y, rz) => {
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 18), mat);
+      m.position.set(x, y, 0); if (rz) m.rotation.z = rz; m.castShadow = true; g.add(m); return m;
+    };
+    const legH = H * 0.47;
+    cyl(H * 0.034, H * 0.028, legH, -H * 0.055, legH / 2);
+    cyl(H * 0.034, H * 0.028, legH, H * 0.055, legH / 2);
+    const torsoH = H - legH - 2 * hr - H * 0.03;
+    cyl(H * 0.095, H * 0.08, torsoH, 0, legH + torsoH / 2);
+    const armH = torsoH * 1.05;
+    cyl(H * 0.026, H * 0.022, armH, -H * 0.125, legH + torsoH - armH / 2, 0.07);
+    cyl(H * 0.026, H * 0.022, armH, H * 0.125, legH + torsoH - armH / 2, -0.07);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(hr, 24, 18), mat);
+    head.position.y = H - hr; head.castShadow = true; g.add(head);
+    g.userData = { H, person: p };
+    return g;
+  }
+
+  // ------------------------------------------------------------------ assembling it all
+  const labelsEl = document.getElementById("labels");
+  let labelEls = [], personLabels = [];
+
+  function rebuild(keepCamera) {
+    if (cabinet) {
+      scene.remove(cabinet.group);
+      cabinet.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
+    }
+    if (!finishes(build()).some(f => f.id === state.finish)) state.finish = "birch";
+    cabinet = buildCabinet();
+    scene.add(cabinet.group);
+    buildTable(cabinet.b, cabinet.size);
+
+    labelsEl.textContent = "";
+    labelEls = cabinet.parts.filter(p => !p.noList).map(p => {
+      const el = document.createElement("div");
+      el.className = "tag3d"; el.textContent = p.id;
+      labelsEl.appendChild(el);
+      return { el, p };
+    });
+    placePeople();
+    renderPanel();
+    if (!keepCamera) frameCamera(true);
+  }
+
+  function placePeople() {
+    peopleGroup.clear();
+    personLabels.forEach(l => l.el.remove());
+    personLabels = [];
+    const on = PEOPLE.filter(p => state.people[p.id]);
+    const s = cabinet.size, b = cabinet.b;
+    on.forEach((p, i) => {
+      const fig = makePerson(p);
+      // line up beside the cabinet, level with the control deck, so nobody hides it
+      // arms hang out in an A-pose, so give each body about half its height of room
+      const x = -(s.x / 2 + 0.12 + on.slice(0, i + 1).reduce((acc, q, j) => acc + q.cm / 100 * (j === i ? 0.27 : 0.5), 0));
+      fig.userData.home = new THREE.Vector3(x, 0, b.side.E[1] * IN * 0.75);
+      fig.userData.flat = new THREE.Vector3(-cabinet.flatExtent.x / 2 - 0.35 - i * 0.42, 0, cabinet.flatExtent.y / 2 - 0.2);
+      peopleGroup.add(fig);
+      const el = document.createElement("div");
+      el.className = "tag3d person";
+      el.textContent = `${p.name} · ${state.units === "in" ? ftIn(p.cm) : p.cm + " cm"}`;
+      labelsEl.appendChild(el);
+      personLabels.push({ el, fig });
+    });
+  }
+
+  // ------------------------------------------------------------------ camera
+  let camTween = null;
+  // On a table, exploding lifts the cabinet a little so its base can drop clear of the table top
+  const reachOf = b => 0.5 + 0.55 * b.scale;                 // far enough that no two parts touch
+  const tableLift = e => cabinet.b.table ? e * reachOf(cabinet.b) * 0.5 : 0;
+  // Fit the camera to where everything will END UP for this view: the parts at
+  // their exploded or flat-pack spots, the table, and anyone standing beside it.
+  const _box = new THREE.Box3(), _v = new THREE.Vector3(), _s = new THREE.Sphere();
+  function camGoal() {
+    const flatView = state.view === "flat";
+    const e = state.view === "exploded" ? state.spread : 0;
+    const reach = reachOf(cabinet.b);
+    const lift = flatView ? 0 : tableH(cabinet.b) * IN + tableLift(e);
+    _box.makeEmpty();
+    for (const p of cabinet.parts) {
+      if (flatView) _v.copy(p.flat.pos);
+      else _v.copy(p.home.pos).addScaledVector(p.dir, e * reach * p.dist);
+      _v.y += lift;
+      const r = p.radius * 0.8;
+      _box.expandByPoint(_v.clone().addScalar(r)).expandByPoint(_v.clone().addScalar(-r));
+    }
+    // people are for scale in the built view; exploded / flat-pack frame the parts
+    if (state.view === "assembled") for (const fig of peopleGroup.children) {
+      const at = flatView ? fig.userData.flat : fig.userData.home, r = fig.userData.H * 0.22;
+      _box.expandByPoint(new THREE.Vector3(at.x - r, 0, at.z - r)).expandByPoint(new THREE.Vector3(at.x + r, fig.userData.H, at.z + r));
+    }
+    if (!flatView && table.children.length) {
+      // the table top is enough context; its legs would pull the camera down
+      const tb = new THREE.Box3().setFromObject(table);
+      if (state.view === "exploded") tb.min.y = tb.max.y - 0.05;
+      _box.union(tb);
+    }
+    _box.getBoundingSphere(_s);
+    // far enough that the sphere fits the visible part of the view, both ways
+    const vfov = THREE.MathUtils.degToRad(camera.fov);
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * viewAspect);
+    // a bounding sphere is roomier than the parts themselves, so come in a little
+    const dist = _s.radius / Math.sin(Math.min(vfov, hfov) / 2) * (state.view === "assembled" ? 0.92 : 0.8);
+    const dir = flatView ? new THREE.Vector3(0.35, 1.05, 0.95) : new THREE.Vector3(1.2, 0.42, 1.9);
+    const target = _s.center.clone();
+    return { target, pos: target.clone().addScaledVector(dir.normalize(), dist) };
+  }
+  function frameCamera(instant) {
+    const g = camGoal();
+    if (instant || REDUCED) {
+      controls.target.copy(g.target); camera.position.copy(g.pos); controls.update(); camTween = null; return;
+    }
+    camTween = { t: 0, fromT: controls.target.clone(), fromP: camera.position.clone(), to: g };
+  }
+  controls.addEventListener("start", () => { camTween = null; });
+  // open hand over the scene, closed hand while dragging it
+  renderer.domElement.addEventListener("pointerdown", () => renderer.domElement.classList.add("dragging"));
+  window.addEventListener("pointerup", () => renderer.domElement.classList.remove("dragging"));
+  window.addEventListener("pointercancel", () => renderer.domElement.classList.remove("dragging"));
+
+  // WASD walks the camera across the floor (target and all), Q/E raise and lower it,
+  // arrows orbit, R reframes it
+  const keys = new Set();
+  const typing = e => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== "checkbox" && e.target.type !== "range";
+  window.addEventListener("keydown", e => {
+    if (e.metaKey || e.ctrlKey || e.altKey || typing(e)) return;
+    const k = e.key.toLowerCase();
+    if (("wasdqe".includes(k) && k.length === 1) || k.startsWith("arrow")) { keys.add(k); camTween = null; e.preventDefault(); }
+    else if (k === "r") { frameCamera(false); e.preventDefault(); }
+    else if (/^[1-9]$/.test(k) && DATA.builds[+k - 1]) {
+      // 1 / 2 / 3 pick a size, in the order the Size buttons show them
+      state.build = DATA.builds[+k - 1].id; save(); rebuild(false); e.preventDefault();
+    }
+  });
+  window.addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+  window.addEventListener("blur", () => keys.clear());
+  const fwd = new THREE.Vector3(), right = new THREE.Vector3(), move = new THREE.Vector3();
+  const orbit = new THREE.Spherical(), offset = new THREE.Vector3();
+  function walk(dt) {
+    if (!keys.size) return;
+    // arrow keys orbit around the target, like dragging
+    const turn = (keys.has("arrowleft") ? 1 : 0) - (keys.has("arrowright") ? 1 : 0);
+    const tilt = (keys.has("arrowup") ? 1 : 0) - (keys.has("arrowdown") ? 1 : 0);
+    if (turn || tilt) {
+      offset.copy(camera.position).sub(controls.target);
+      orbit.setFromVector3(offset);
+      orbit.theta += turn * dt * 1.4;
+      orbit.phi = Math.min(controls.maxPolarAngle, Math.max(0.05, orbit.phi - tilt * dt * 1.0));
+      camera.position.copy(controls.target).add(offset.setFromSpherical(orbit));
+    }
+    camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+    right.crossVectors(fwd, camera.up).normalize();
+    move.set(0, 0, 0);
+    if (keys.has("w")) move.add(fwd);
+    if (keys.has("s")) move.sub(fwd);
+    if (keys.has("d")) move.add(right);
+    if (keys.has("a")) move.sub(right);
+    if (keys.has("q")) move.y += 1;
+    if (keys.has("e")) move.y -= 1;
+    if (!move.lengthSq()) return;
+    // faster when zoomed out, so it feels the same at any distance
+    move.normalize().multiplyScalar(dt * Math.max(0.6, camera.position.distanceTo(controls.target) * 0.6));
+    // keep the view above the floor
+    move.y = Math.max(move.y, 0.02 - Math.min(camera.position.y, controls.target.y));
+    camera.position.add(move); controls.target.add(move);
+  }
+
+  // ------------------------------------------------------------------ animation
+  let explode = 0, flat = 0;
+  const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion();
+  const ease = x => x < 0.5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+  function step(dt) {
+    const wantE = state.view === "exploded" ? state.spread : 0;
+    const wantF = state.view === "flat" ? 1 : 0;
+    const rate = REDUCED ? 1 : Math.min(1, dt * 3.2);
+    explode += (wantE - explode) * rate;
+    flat += (wantF - flat) * (REDUCED ? 1 : Math.min(1, dt * 2.4));
+    if (Math.abs(wantE - explode) < 1e-4) explode = wantE;
+    if (Math.abs(wantF - flat) < 1e-4) flat = wantF;
+    const f = ease(flat);
+    const onTable = tableH(cabinet.b) * IN;
+    cabinet.group.position.y = (onTable + tableLift(explode)) * (1 - f);
+    table.visible = f < 0.02;
+    const reach = reachOf(cabinet.b);
+    for (const p of cabinet.parts) {
+      tmpV.copy(p.home.pos).addScaledVector(p.dir, explode * reach * p.dist);
+      p.mesh.position.lerpVectors(tmpV, p.flat.pos, f);
+      p.mesh.position.y += Math.sin(Math.PI * f) * 0.45 * cabinet.b.scale;   // lift clear while flipping
+      p.mesh.quaternion.slerpQuaternions ? p.mesh.quaternion.slerpQuaternions(p.home.q, p.flat.q, f)
+        : p.mesh.quaternion.copy(p.home.q).slerp(p.flat.q, f);
+    }
+    for (const fig of peopleGroup.children) fig.position.lerpVectors(fig.userData.home, fig.userData.flat, f);
+    // people are for scale next to the built cabinet; they step out for the other views
+    peopleGroup.visible = state.view === "assembled" && explode < 0.02 && flat < 0.02;
+
+    if (camTween) {
+      camTween.t = Math.min(1, camTween.t + dt / 0.9);
+      const k = ease(camTween.t);
+      controls.target.lerpVectors(camTween.fromT, camTween.to.target, k);
+      camera.position.lerpVectors(camTween.fromP, camTween.to.pos, k);
+      if (camTween.t >= 1) camTween = null;
+    }
+  }
+
+  const proj = new THREE.Vector3();
+  function placeLabels() {
+    const show = Math.max(explode / Math.max(state.spread, 0.01) * (state.view === "exploded" ? 1 : 0), flat) > 0.6;
+    const w = renderer.domElement.clientWidth, h = renderer.domElement.clientHeight;
+    for (const { el, p } of labelEls) {
+      p.mesh.getWorldPosition(proj);
+      if (flat < 0.5) proj.addScaledVector(p.dir, 0.02);
+      proj.project(camera);
+      el.style.left = ((proj.x + 1) / 2 * w) + "px";
+      el.style.top = ((1 - proj.y) / 2 * h) + "px";
+      el.style.opacity = show && proj.z < 1 ? 1 : 0;
+    }
+    for (const { el, fig } of personLabels) {
+      proj.set(fig.position.x, fig.userData.H + 0.12, fig.position.z).project(camera);
+      el.style.left = ((proj.x + 1) / 2 * w) + "px";
+      el.style.top = ((1 - proj.y) / 2 * h) + "px";
+      el.style.opacity = peopleGroup.visible && proj.z < 1 ? 1 : 0;
+    }
+  }
+
+  // ------------------------------------------------------------------ hover
+  const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+  const tip = document.getElementById("tip");
+  let hot = null, pointer = null;
+  function setHot(p) {
+    if (hot === p) return;
+    const glow = (part, on) => part && part.mesh.traverse(m => {
+      if (!m.isMesh) return;
+      const see = on && state.xray;
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(mt => {
+        if (mt.emissive) mt.emissive.setHex(on ? 0x6a4a00 : 0x000000);
+        // x-ray: the hovered part goes see-through so you can look inside
+        if (mt.transparent !== see) { mt.transparent = see; mt.needsUpdate = true; }
+        mt.opacity = see ? 0.28 : 1;
+        mt.depthWrite = !see;
+      });
+    });
+    glow(hot, false); hot = p; glow(hot, true);
+    document.querySelectorAll("#parts li").forEach(li => li.classList.toggle("hot", !!p && li.dataset.key === p.key));
+  }
+  function describe(p) {
+    const [l, w, th] = p.size;
+    return `<b>${p.id}</b>${p.name}<br><span class="m">${fmtPair(l, w)} · ${fmt(th)} thick</span>`;
+  }
+  renderer.domElement.addEventListener("pointermove", e => {
+    pointer = e;
+    const r = renderer.domElement.getBoundingClientRect();
+    mouse.set((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1);
+    ray.setFromCamera(mouse, camera);
+    const hit = ray.intersectObjects(cabinet.group.children, true)[0];
+    const p = hit ? hit.object.userData.part : null;
+    setHot(p || null);
+    if (p) {
+      tip.innerHTML = describe(p); tip.hidden = false;
+      tip.style.left = e.clientX + "px"; tip.style.top = e.clientY + "px";
+    } else tip.hidden = true;
+  });
+  renderer.domElement.addEventListener("pointerleave", () => { setHot(null); tip.hidden = true; });
+
+  // ------------------------------------------------------------------ panel
+  function segButtons(el, items, key, onPick) {
+    el.textContent = "";
+    for (const [val, label] of items) {
+      const bt = document.createElement("button");
+      bt.type = "button"; bt.textContent = label;
+      bt.setAttribute("aria-pressed", String(state[key] === val));
+      bt.addEventListener("click", () => { state[key] = val; save(); onPick(val); });
+      el.appendChild(bt);
+    }
+  }
+  function syncPressed() {
+    document.querySelectorAll("#view button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === state.view)));
+    document.querySelectorAll("#units button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.u === state.units)));
+  }
+  function renderPanel() {
+    const b = cabinet.b, t = cabinet.t;
+    segButtons(document.getElementById("size"), DATA.builds.map(x => [x.id, x.label]), "build", () => rebuild(false));
+
+    const peopleEl = document.getElementById("people");
+    peopleEl.textContent = "";
+    for (const p of PEOPLE) {
+      const c = document.createElement("button");
+      c.type = "button"; c.className = "chip";
+      c.setAttribute("aria-pressed", String(!!state.people[p.id]));
+      c.innerHTML = `${p.name} <small>${state.units === "in" ? ftIn(p.cm) : p.cm + " cm"}</small>`;
+      c.addEventListener("click", () => { state.people[p.id] = !state.people[p.id]; save(); placePeople(); renderPanel(); frameCamera(false); });
+      peopleEl.appendChild(c);
+    }
+
+    // controls vs elbow height: a comfortable deck sits at or a little under the elbow
+    const deckH = (b.side.D[0] + b.side.E[0]) / 2 + tableH(b);    // from the floor, table included
+    const fitEl = document.getElementById("fit");
+    fitEl.textContent = "";
+    for (const p of PEOPLE.filter(p => state.people[p.id])) {
+      const elbow = p.cm * 0.63 / 2.54;
+      const diff = deckH - elbow;
+      const ok = diff <= 1.5 && diff >= -7;
+      const row = document.createElement("p");
+      const verdict = ok ? "comfy" : diff > 0 ? `${fmt(Math.abs(diff))} too high` : `${fmt(Math.abs(diff))} too low`;
+      row.innerHTML = `<span>${p.name}: elbow ≈ ${fmt(elbow)}</span><span class="pill ${ok ? "good" : "warn"}">${verdict}</span>`;
+      fitEl.appendChild(row);
+    }
+
+    const fin = document.getElementById("finish");
+    fin.textContent = "";
+    for (const f of finishes(b)) {
+      const c = document.createElement("button");
+      c.type = "button"; c.className = "chip"; c.textContent = f.name;
+      c.setAttribute("aria-pressed", String(state.finish === f.id));
+      c.addEventListener("click", () => { state.finish = f.id; save(); rebuild(true); });
+      fin.appendChild(c);
+    }
+    const paint = document.getElementById("paint");
+    paint.textContent = "";
+    paint.dataset.off = String(state.finish !== "paint");
+    for (const [name, hex] of PAINTS) {
+      const s = document.createElement("button");
+      s.type = "button"; s.className = "swatch"; s.style.background = hex;
+      s.title = name; s.setAttribute("aria-label", "Paint " + name);
+      s.setAttribute("aria-pressed", String(state.finish === "paint" && state.paint === hex));
+      s.addEventListener("click", () => { state.paint = hex; state.finish = "paint"; save(); rebuild(true); });
+      paint.appendChild(s);
+    }
+    document.getElementById("art").checked = state.art;
+
+    const dims = document.getElementById("dims");
+    const rows = [
+      ["Height", fmt(b.side.B[0])], ["Depth", fmt(b.side.E[1])],
+      ["Outside width", fmt(b.innerWidth + 2 * t)], ["Control deck", fmt(deckH)],
+      ["Screen", b.scale < 1 ? "13.3″" : "27″"], ["Board", fmt(t)],
+    ];
+    if (b.table) rows.push(["On a table", fmt(tableH(b))], ["Deck above table", fmt(deckH - tableH(b))]);
+    dims.innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+    const tr = document.getElementById("tableRow");
+    tr.hidden = !b.table;
+    document.getElementById("tableH").value = state.table;
+    document.getElementById("tableOut").textContent = fmt(state.table);
+
+    // --- how to build it, in the material the finish implies
+    const mat = state.finish === "cardboard" ? "cardboard" : state.finish === "plastic" ? "plastic" : "wood";
+    const mk = (b.make || {})[mat];
+    const buildEl = document.getElementById("build");
+    buildEl.hidden = !mk;
+    if (mk) {
+      const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      document.getElementById("makeHead").innerHTML =
+        `<b>${esc(mk.name)}</b>` + (mat === "cardboard" ? "" : ` · ${mk.sheets} × ${esc(mk.sheet)}`) + `<br>${esc(mk.note)}`;
+      document.getElementById("files").innerHTML = mk.files.map(f => {
+        const ext = f.href.split(".").pop().toUpperCase();
+        return `<li><a href="${esc(f.href)}" target="_blank" rel="noopener"${ext === "PDF" ? "" : " download"}>${esc(f.label.replace(/ \((PDF|DXF|SVG)\)$/, ""))}<small>${ext}</small></a></li>`;
+      }).join("");
+      const qtyTotal = mk.cut.reduce((a, r) => a + r.qty, 0);
+      document.getElementById("cutCount").textContent = `${qtyTotal} pieces`;
+      document.getElementById("cutList").innerHTML = mk.cut.map(r =>
+        `<li title="${esc(r.note)}"><b>${esc(r.id)}</b><span>${esc(r.name)}${r.qty > 1 ? ` <span class="qty">×${r.qty}</span>` : ""}</span><span class="sz">${esc(r.size)}</span></li>`).join("");
+      document.getElementById("buyList").innerHTML = mk.buy.map(g =>
+        `<div class="buy"><h4>${esc(g.group)}</h4>` + g.items.map(i => `<p>${esc(i.name)}${i.note ? `<span>${esc(i.note)}</span>` : ""}</p>`).join("") + `</div>`).join("");
+    }
+
+    const list = document.getElementById("parts");
+    list.textContent = "";
+    cabinet.parts.forEach((p, i) => {
+      if (p.noList) return;
+      p.key = p.id + ":" + i;
+      const li = document.createElement("li");
+      li.dataset.key = p.key;
+      li.innerHTML = `<b>${p.id}</b><span>${p.name}</span><span class="sz">${fmtPair(p.size[0], p.size[1])}</span>`;
+      li.addEventListener("mouseenter", () => setHot(p));
+      li.addEventListener("mouseleave", () => setHot(null));
+      list.appendChild(li);
+    });
+    syncPressed();
+  }
+
+  document.querySelectorAll("#view button").forEach(bt => bt.addEventListener("click", () => {
+    state.view = bt.dataset.v; syncPressed(); frameCamera(false);
+  }));
+  document.querySelectorAll("#units button").forEach(bt => bt.addEventListener("click", () => {
+    state.units = bt.dataset.u; save(); placePeople(); renderPanel();
+  }));
+  document.getElementById("tableH").addEventListener("input", e => {
+    state.table = +e.target.value; save();
+    buildTable(cabinet.b, cabinet.size); renderPanel(); frameCamera(false);
+  });
+  const spread = document.getElementById("spread");
+  spread.value = state.spread;
+  spread.addEventListener("input", () => {
+    state.spread = +spread.value; save();
+    if (state.view === "assembled") { state.view = "exploded"; syncPressed(); }
+    frameCamera(false);                       // keep every part in view as it spreads
+  });
+  document.getElementById("art").addEventListener("change", e => { state.art = e.target.checked; save(); rebuild(true); });
+  const xray = document.getElementById("xray");
+  xray.checked = state.xray;
+  xray.addEventListener("change", () => { state.xray = xray.checked; save(); const h = hot; setHot(null); setHot(h); });
+
+  // ------------------------------------------------------------------ loop
+  // The panel covers part of the window, so centre the model in what's left:
+  // to the right of it on desktop, above it on phones. Collapsing it gives the
+  // model the whole window back.
+  const panelEl = document.querySelector(".panel");
+  let viewAspect = 1;
+  function resize() {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    const r = panelEl.getBoundingClientRect();
+    const collapsed = panelEl.classList.contains("collapsed");
+    let ox = 0, oy = 0, vw = w, vh = h;
+    if (w >= 720) {
+      if (!collapsed) { vw = w - r.right; ox = -r.right / 2; }
+    } else {
+      const covered = Math.max(0, h - r.top);
+      vh = h - covered; oy = covered / 2;
+    }
+    viewAspect = vw / vh;
+    camera.setViewOffset(w, h, ox, oy, w, h);
+    camera.updateProjectionMatrix();
+  }
+  window.addEventListener("resize", resize);
+  const collapseBtn = document.getElementById("collapse");
+  function setCollapsed(on) {
+    panelEl.classList.toggle("collapsed", on);
+    collapseBtn.setAttribute("aria-expanded", String(!on));
+    collapseBtn.title = on ? "Show the panel" : "Hide the panel";
+    state.collapsed = on; save();
+    resize();
+    if (cabinet) frameCamera(false);
+  }
+  collapseBtn.addEventListener("click", () => setCollapsed(!state.collapsed));
+  document.getElementById("brandBtn").addEventListener("click", () => setCollapsed(!state.collapsed));
+  // once someone starts moving the view, the controls hint shrinks to a pill
+  const hintEl = document.getElementById("hint");
+  const shrinkHint = () => hintEl.classList.add("mini");
+  renderer.domElement.addEventListener("pointerdown", shrinkHint, { once: true });
+  renderer.domElement.addEventListener("wheel", shrinkHint, { once: true, passive: true });
+  window.addEventListener("keydown", e => { if (keys.size || e.key.toLowerCase() === "r") shrinkHint(); });
+  if (state.collapsed) { panelEl.classList.add("collapsed"); collapseBtn.setAttribute("aria-expanded", "false"); collapseBtn.title = "Show the panel"; }
+
+  let last = performance.now(), lastScreen = 0;
+  function frame(now) {
+    const dt = Math.min(0.05, (now - last) / 1000);
+    last = now;
+    step(dt);
+    walk(dt);
+    controls.update();
+    if (now - lastScreen > 80) { drawScreen(now); lastScreen = now; }
+    placeLabels();
+    renderer.render(scene, camera);
+    requestAnimationFrame(frame);
+  }
+
+  resize();
+  rebuild(false);
+  loadBodies();
+  requestAnimationFrame(frame);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => rebuild(true));
+})();
+</script>
+<!-- VIEWER:END -->
+</body>
+</html>

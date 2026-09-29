@@ -1,0 +1,10 @@
+adult.glb, kid5.glb
+
+Source: Blender Studio "Human Base Meshes" bundle v1.0
+(https://studio.blender.org / https://www.blender.org/download/demo-files/)
+License: CC0 1.0 Universal (public domain) - https://creativecommons.org/publicdomain/zero/1.0/
+
+adult.glb = "Body Male - Realistic"; kid5.glb = "Body Female - Stylized". Decimated, textures removed and re-centred
+(feet at the origin) for the Supercade viewer. The viewer scales each one to the
+height it represents (170 cm, 110 cm). The 8-year-old (128 cm) is the adult mesh
+with a larger head and a slimmer body, made in the viewer.
