@@ -3,16 +3,21 @@
 A 3D model of the Supercade cabinet built from the same numbers as the
 printable plans. You can:
 
-- **Switch size:** full size, kid height (8" lower) or half scale.
+- **Switch size:** the bartop (on a table, with a table-height slider), full
+  size, or kid height (8" lower).
 - **Take it apart:** *Built*, *Exploded* (the Spread slider sets how far) or
-  *Flat-pack* (every part laid out on the cutting mat).
+  *Flat-pack* (every part laid out on the cutting mat). Turn on *X-ray* to see
+  through whichever part you hover.
 - **Add people for scale:** an adult (170 cm) and kids aged 8 and 5, using
   CC0 body meshes from Blender Studio's Human Base Meshes (see
-  `people/LICENSE.txt`). The panel compares each person's elbow height with
+  `people/LICENSE.txt`); the 8-year-old is the adult mesh with child
+  proportions. The panel compares each person's elbow height with
   the control deck.
-- **Try finishes:** cardboard, birch ply, walnut or paint (7 colours), with
-  optional side-art stripes.
+- **Try finishes:** plastic, birch ply, walnut or paint (7 colours), plus
+  cardboard for the bartop, with optional side-art stripes.
 - **Read sizes:** hover any part for its size, and switch between inches and cm.
+- **Move around:** drag to orbit, scroll to zoom, right-drag to pan. WASD
+  moves, Q/E go up and down, the arrow keys turn, and R resets the view.
 
 ## Run it
 

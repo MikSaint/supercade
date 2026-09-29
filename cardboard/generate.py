@@ -28,7 +28,16 @@ from dataclasses import dataclass, field
 
 import pymupdf
 
+import fabrication as fab
+
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Snapshot layout (development continues in the Super Labs site repo):
+#   <build>/        PDFs + 1:1 templates
+#   cad/            DXF + SVG cut files
+#   viewer/         the 3D builder, data.js + people.js
+OUT = HERE
+PLANS = HERE
+BUILDER = os.path.join(HERE, "viewer")
 PT = 72.0  # points per inch
 MM = 1 / 25.4
 LETTER = pymupdf.paper_rect("letter")
@@ -52,7 +61,10 @@ SIDE = {
 SIDE_ORDER = "ABCDEFGH"
 LOWER_SHELF_H = 9.5   # Arcade-Mockup.pdf side view, 10" shelf
 INNER_WIDTH = 29.0    # every cross panel in the original is 29" wide
-SPEAKER_W, SPEAKER_H = 5.25, 4.0  # Arcade-Panels.pdf speaker ovals
+# The original CAD has 5 1/4" x 4" oval car speakers. Round holes suit the
+# speakers people actually buy: 4" (100 mm) drivers on the full size, 2" (50 mm)
+# ones on the bartop.
+SPEAKER_FULL, SPEAKER_SMALL = 4.0, 2.0
 
 # The screen sits back in a recess behind the front frame (Arcade-Mockup.pdf
 # side view, same h/d axes as SIDE). Speakers are in the recess ceiling,
@@ -65,6 +77,33 @@ RECESS = {
     "R1": (46.52, 6.46),   # recess floor top, back
 }
 FRAME_BORDER = 1.0     # frame edge left beside the opening, each side
+
+# Bartop: a short cabinet that stands on a table. It keeps the half-scale
+# deck (same Foamex plate and control box) and the 13.3" monitor, but the
+# screen and speakers sit in ONE flat, tilted front board, like OpenCade, so
+# there is no recess. Everything else is the same A-G letters, minus the kick
+# panel. h = up from the table, d = forward from the back.
+BARTOP_TILT = 15.0                  # front board leans back this many degrees
+BARTOP_FRONT = 11.0                 # front board length, D (bottom) to C (top)
+BARTOP_SPEAKER_AT = 1.5             # speaker centres, up the board from D
+BARTOP_WINDOW = (3.5, 10.0)         # screen window, up the board from D
+BARTOP_MONITOR_BORDER = 0.35        # portable monitor bezel below the picture
+
+
+def bartop_side():
+    d_h, d_d = 6.15, 7.0            # D: bottom of the front board / back of the deck
+    t = math.radians(BARTOP_TILT)
+    c = (d_h + BARTOP_FRONT * math.cos(t), d_d - BARTOP_FRONT * math.sin(t))
+    e = (d_h - 0.9, d_d + 7.32)     # the half-scale deck: 7 3/8" long, 7 deg down to the players
+    return {
+        "A": (0.0, 0.0),            # table, back
+        "B": (c[0], 0.0),           # top, back
+        "C": c,                     # top, front
+        "D": (d_h, d_d),
+        "E": e,                     # deck, front edge
+        "F": (e[0] - 1.5, e[1]),    # lip, bottom
+        "G": (0.0, e[1] - 1.25),    # table, front: the base leans in under the deck
+    }
 
 
 @dataclass
@@ -173,6 +212,18 @@ class Build:
     nest_note: str = ""
     filename: str = ""
     control_box: bool = False  # also make the standalone control-box plans
+    # Shape. By default the original CAD profile, scaled; the bartop brings its own.
+    side_override: dict = None
+    order: str = SIDE_ORDER
+    panel_spec: tuple = None   # ((id, name, "A-B", note), ...) instead of the original list
+    recess: bool = True        # screen set back in a recess (P4a-c) behind a frame
+    shelf: bool = True         # lower shelf P11
+    table: float = 0.0         # stands on a table this high (the viewer draws one)
+    point_desc: dict = None    # what each side-panel point is, for page 2
+    how: str = ""              # overview: how this version goes together
+    steps: tuple = None        # assembly steps, if not the cabinet's
+    safety: str = ""
+    speaker_note: str = "Cut 2 in P4a, the speaker shelf, so they point down at the players. Skip if your monitor has speakers."
 
     @property
     def inner_width(self):
@@ -184,13 +235,19 @@ class Build:
 
     @property
     def shelf_h(self):
-        return LOWER_SHELF_H * self.scale - self.lower
+        return LOWER_SHELF_H * self.scale - self.lower if self.shelf else 0.0
+
+    @property
+    def speaker_d(self):
+        return SPEAKER_FULL if self.scale >= 1 else SPEAKER_SMALL
 
     @property
     def screw_pitch(self):
         return max(3.5, 6 * self.scale)
 
     def side_points(self):
+        if self.side_override:
+            return dict(self.side_override)
         pts = {k: (h * self.scale, d * self.scale) for k, (h, d) in SIDE.items()}
         if self.lower:
             # Trim the floor end: the kick slope H->G keeps its angle, so H
@@ -201,6 +258,54 @@ class Build:
             pts = {k: (h - self.lower, d) for k, (h, d) in pts.items()}
             pts["A"], pts["H"] = (0.0, 0.0), (0.0, new_hd)
         return pts
+
+    @property
+    def floor_front(self):
+        return self.order[-1]
+
+    def front_layout(self):
+        """Flat front board (bartop): window and speakers, measured down from C."""
+        L = BARTOP_FRONT
+        w0, w1 = BARTOP_WINDOW
+        return {"window": (L - w1, L - w0), "speakers": L - BARTOP_SPEAKER_AT,
+                "monitor_bottom": L - (w0 - BARTOP_MONITOR_BORDER)}
+
+    def ledge(self):
+        """P10 on the bartop: an L-angle glued under the monitor, between the speakers."""
+        gap = self.inner_width * 0.56 - self.speaker_d   # between the two speaker holes
+        return {"width": math.floor((gap - 0.5) * 4) / 4, "leg": 1.25}
+
+    def back_openings(self):
+        """Openings in the back panel P2: x across from the left, s up from the floor (A)."""
+        W, Lb = self.inner_width, self.side_points()["B"][0]
+        if not self.recess:
+            # bartop: one big door gets you to the monitor, speakers and computer
+            vy = Lb - 1.1
+            return {
+                "doors": [("P2a", "Rear door", (2.0, 2.25, W - 2.0, Lb - 3.0),
+                           "Hinged along the bottom, Velcro at the top.")],
+                "cable": (W / 2, 1.1, 1.5),
+                "vents": [(W / 2 + (i - 1.5) * 1.5, vy, 0.75) for i in range(4)],
+            }
+        k = self.scale
+        r = self.recess_points()
+        mon = (r["M1"][0] + r["M2"][0]) / 2         # middle of the monitor
+        dw, dh, hw, hh = 12 * k, 20 * k, 16 * k, 10 * k
+        return {
+            "doors": [
+                ("P2a", "Lower door", ((W - dw) / 2, 4 * k, (W + dw) / 2, 4 * k + dh),
+                 "Hinged along the bottom, Velcro at the top."),
+                ("P2b", "Monitor hatch", ((W - hw) / 2, mon - hh / 2, (W + hw) / 2, mon + hh / 2),
+                 "Lifts right out; 4 screws hold it on."),
+            ],
+            "cable": (W / 2, 2 * k, 1.5),
+            "vents": [(W / 2 + (i - 2) * 3 * k, Lb - 2.5 * k, 1.0) for i in range(5)],
+        }
+
+    def back_note(self):
+        o = self.back_openings()
+        doors = " and ".join(f"a {frac(x1 - x0)} x {frac(s1 - s0)} {name.lower()}" for _, name, (x0, s0, x1, s1), _ in o["doors"])
+        return f"Cut {doors}, a {frac(o['cable'][2])} cable hole and {len(o['vents'])} vent holes (page 5)."
 
     def frame_note(self):
         s0, s1, b = self.frame_opening()
@@ -213,6 +318,22 @@ class Build:
         side = max(1.5, round(3 * self.scale * 2) / 2)
         tab = 1.0 if self.scale >= 0.75 else 0.75
         return top, side, tab
+
+    def screen_shelf_depth(self):
+        """Deepest the P10 beam can be: from the back panel to the screen board.
+
+        The board leans back, so the gap narrows going up; measured at the
+        board's middle (the monitor's centre, above the shelf) to be safe,
+        less a board thickness at each end. Rounded down to 1/4".
+        """
+        r = self.recess_points()
+        (h1, d1), (h2, d2) = r["M1"], r["M2"]
+        gap = (d1 + d2) / 2 - 2 * 0.3
+        return min(self.beam()[0], math.floor(gap * 4) / 4)
+
+    def screen_shelf_side(self):
+        """P10 only carries the monitor, so its tube is half as thick as P11's."""
+        return max(0.75, round(1.5 * self.scale * 4) / 4)
 
     def front_d(self, h):
         """Depth of the front edge C-D at height h."""
@@ -236,12 +357,13 @@ class Build:
 
     def inner_panels(self):
         """Recess parts: id, name, (a, b) face line, length, note, visible-face normal (dh, dd)."""
+        if not self.recess:
+            return []
         r = self.recess_points()
         L = lambda a, b: math.hypot(r[b][0] - r[a][0], r[b][1] - r[a][1])
-        sw = SPEAKER_W * self.scale
         return [
             ("P4a", "Speaker shelf", ("S1", "S2"), L("S1", "S2"),
-             f"Recess ceiling. Two {frac(sw)} x {frac(SPEAKER_H * self.scale)} speaker holes, pointing DOWN at the players.", (-1, 0)),
+             f"Recess ceiling. Two {frac(self.speaker_d)} round speaker holes, pointing DOWN at the players.", (-1, 0)),
             ("P4b", "Screen board", ("M1", "M2"), L("M1", "M2"),
              self.screen_window + " Leans back 5 degrees; the monitor bolts or straps on behind it.", (0, 1)),
             ("P4c", "Recess floor", ("R1", "R2"), L("R1", "R2"),
@@ -251,10 +373,12 @@ class Build:
     def cross_panels(self):
         p = self.side_points()
         L = lambda a, b: edge_len(p, a, b)
+        if self.panel_spec:
+            return [(pid, name, edge, L(*edge.split("-")), self.back_note() if pid == "P2" else note)
+                    for pid, name, edge, note in self.panel_spec]
         return [
             # id, name, edge, length, notes
-            ("P2", "Back", "A-B", L("A", "B"),
-             f"Cut a {frac(12 * self.scale)} x {frac(20 * self.scale)} service door low down (optional)."),
+            ("P2", "Back", "A-B", L("A", "B"), self.back_note()),
             ("P3", "Top", "B-C", L("B", "C"), ""),
             ("P4", "Front frame", "C-D", L("C", "D"), self.frame_note()),
             ("P5", "Control deck", "D-E", L("D", "E"), self.deck_note),
@@ -298,7 +422,7 @@ FULL_SHOPPING = [
         ("\"Zero delay\" 2-player arcade kit (joysticks + 30 mm buttons + USB encoders)", "Pick one with SCREW-IN buttons, 20+ buttons to cover start/coin."),
         ("Screen", "Sized for a 27\" monitor. An old 22-27\" monitor or a light TV is fine."),
         ("Computer", "Raspberry Pi 4/5 running an arcade front-end, or any old laptop/mini PC."),
-        ("Speakers", "Two small speakers that fit a 5 1/4\" x 4\" oval cut-out."),
+        ("Speakers", "Two 4\" (100 mm) round speakers, or any pair whose cut-out is 4\" or less."),
         ("Power strip with a switch", "One switch for everything; mount it on the lower shelf."),
         ("Weight for the base", "2 x 10 lb sandbags or bags of rice/gravel on the lower shelf."),
     ]),
@@ -323,7 +447,7 @@ HALF_SHOPPING = [
         ("\"Zero delay\" 2-player arcade kit with 24 mm buttons", "Needs 2 sticks + 16 x 24 mm buttons (12 action + 2 start + 2 coin). If the kit only has 30 mm, buy a 24 mm pack. SCREW-IN type."),
         ("13.3\" portable USB-C monitor", "~0.7 kg. Built-in speakers are common, so check and skip separate ones."),
         ("Computer", "Raspberry Pi 4/5 with an arcade front-end, or an old laptop behind the cabinet."),
-        ("Small USB speakers (optional)", "Only if the monitor has none. Two 2 5/8\" x 2\" oval cut-outs are in the templates."),
+        ("Small speakers (optional)", "Only if the monitor has none. Two 2\" (50 mm) round drivers + a small USB amp; the cut-outs are in the templates."),
         ("Weight for the base", "A 2 kg bag of rice or a couple of books on the lower shelf."),
     ]),
     ("TOOLS", [
@@ -334,23 +458,69 @@ HALF_SHOPPING = [
     ]),
 ]
 
+BARTOP_SHOPPING = [
+    (title, [(n, v) for n, v in items]) for title, items in HALF_SHOPPING
+]
+BARTOP_SHOPPING[0][1][0] = ("Big cardboard boxes", "2-3 large ones. The longest parts are under 18\" long, so most moving boxes work.")
+BARTOP_SHOPPING[0][1].append(("Velcro strips", "Holds the back door shut and the top of the monitor to the screen board."))
+BARTOP_SHOPPING[1][1][2] = ("Computer", "A Raspberry Pi 4/5 on the base, or run the controls out of the cable hole to a laptop or TV.")
+BARTOP_SHOPPING[1][1][4] = ("Weight + grip", "About 1 kg (a bag of rice) on the base, and a non-slip mat under it.")
+
 HALF_DECK = compact_controls(INNER_WIDTH * 0.5, edge_len({k: (h * 0.5, d * 0.5) for k, (h, d) in SIDE.items()}, "D", "E"))
+
+BARTOP_PTS = bartop_side()
+_bw0, _bw1 = BARTOP_FRONT - BARTOP_WINDOW[1], BARTOP_FRONT - BARTOP_WINDOW[0]
 
 BUILDS = [
     Build(
-        key="half-scale", title="Half scale", scale=0.5, flange=1.5,
-        controls=HALF_DECK, filename="SuperCade-Half-Plans.pdf", control_box=True,
+        key="bartop", title="Mini bartop", scale=0.5, flange=1.5,
+        controls=HALF_DECK, filename="SuperCade-Bartop-Plans.pdf", control_box=True,
+        side_override=BARTOP_PTS, order="ABCDEFG", recess=False, shelf=False, table=28.0,
+        panel_spec=(
+            ("P2", "Back", "A-B", ""),
+            ("P3", "Top", "B-C", ""),
+            ("P4", "Screen board", "C-D",
+             f"The whole front, one flat piece. Centred window 11 5/8\" x 6 1/2\", {frac(_bw0)} to {frac(_bw1)} "
+             f"down from the C edge. Two 2\" round speaker holes {frac(BARTOP_FRONT - BARTOP_SPEAKER_AT)} down (speaker template)."),
+            ("P5", "Control deck", "D-E", "1 layer of cardboard + the Foamex plate (P12) on top. Under each joystick, cut an opening just bigger than the stick's plate, so the stick bolts to the Foamex only."),
+            ("P6", "Control lip", "E-F", "Front face under the players' wrists."),
+            ("P7", "Front base", "F-G", "Leans in under the deck, so knees and fingers clear it."),
+            ("P8", "Base", "G-A", "Stands on the table. The Pi and the ballast go on it."),
+        ),
+        point_desc={"A": "table, back corner", "B": "top, back corner", "C": "top, front corner",
+                    "D": "screen board meets deck", "E": "deck, front edge", "F": "lip, bottom",
+                    "G": "table, front corner"},
         screen='13.3" portable USB-C monitor',
         screen_window='Centred window 11 5/8" x 6 1/2" (13.3" monitor visible area; measure yours).',
         material="cardboard body, 5 mm Foamex deck plate",
-        deck_note="1 layer of cardboard + the Foamex plate (P12) on top. Under each joystick, cut an opening in the cardboard just bigger than the stick's mounting plate, so the stick bolts to the Foamex only.",
+        deck_note="",
         deck_extra=("P12", "Deck top plate", "1", None, "-",
                     "5 mm Foamex (PVC foam board). Tape the 1:1 template to it, cut every hole, then drill through into P5."),
-        ballast="a 2 kg bag of rice on the lower shelf",
+        ballast="about 1 kg (a bag of rice) on the base",
         cover=False,
-        shopping=HALF_SHOPPING,
-        stock_note="Cardboard: 4-5 big boxes. The longest parts (sides + back) are about 37\" long, so you need at least one box with a panel that long - TV, bike and wardrobe boxes are.",
-        nest_note="Each side is 36 7/8\" x 12 1/4\". Trace the second from the first, flipped over.",
+        shopping=BARTOP_SHOPPING,
+        stock_note="Cardboard: 2-3 big boxes. The longest parts (sides, back and screen board) are under 18\" long.",
+        nest_note=f"Each side is {frac(BARTOP_PTS['B'][0])} x {frac(BARTOP_PTS['E'][1])}. Trace the second from the first, flipped over.",
+        how=("A short cabinet that stands on a table, OpenCade style: the screen and both speakers sit in ONE "
+             "flat front board (P4) that leans back 15 degrees, so there's no recess to build. The deck is the "
+             "control box's: same Foamex plate, same template, so it moves over with the wiring intact.\n\n"
+             "Every cross panel (P2-P8) gets a 1 1/2\" flange folded down on each end. The flange lies flat "
+             "against the inside of the side panel and a kit screw + nut goes through both layers, face to face.\n\n"
+             "The back has one big door for the monitor, speakers and computer, a cable hole and a row of vents (page 5)."),
+        steps=(
+            ("Test the screws", "Screw scrap to scrap in the exact layers you'll use (page 7 note)."),
+            ("Draw + cut the sides (P1)", "Page 2. Cut one, flip it, trace the second. Label the insides 'LEFT' and 'RIGHT'."),
+            ("Cut + score the cross panels (P2-P8)", "Page 3 sizes, page 4 flanges. Cut the back door, cable hole and vents in P2 now (page 5), and the window + speaker holes in P4."),
+            ("Build the control deck (P5 + P12)", "Cut every hole in the Foamex plate from the 1:1 template, lay it on P5 and mark through. Cut P5's holes plus a bigger opening under each stick. Bolt plate + P5 together at the corners, then mount sticks and buttons on the bench."),
+            ("Box it up", "Lay one side flat, inside face up. Screw in P8 (base), P2 (back) and P3 (top), then P7, P6 and the pre-wired deck P5. Put the second side on top and screw everything."),
+            ("Screen board + ledge (P4, P10)", "Glue the P10 ledge to the back of P4 under the window, between the speaker holes. Screw P4 in and fit the speakers behind their holes."),
+            ("Monitor + electronics", "Through the back door: stand the monitor on the ledge, face against the window, and Velcro its top to P4. Encoders and the Pi go on the base; one lead out of the cable hole."),
+            ("Glue + finish", "Once it all works, back out one screw at a time, run glue into the joint, re-screw. Tape the edges, then paint or wrap it."),
+        ),
+        safety=("SAFETY. Light, but it tips forward if someone leans on the deck: put 1 kg on the base, a "
+                "non-slip mat under it, and keep it back from the table edge. Adults do the knife and Foamex "
+                "cutting; kids use the kit's safe saw. Keep the vents clear."),
+        speaker_note="Cut 2 in P4, under the screen window. Skip if your monitor has speakers.",
     ),
     Build(
         key="full-size", title="Full size (original)", scale=1.0,
@@ -440,13 +610,13 @@ def fit_scale(b, max_h_pt, max_w_pt):
     return min(max_h_pt / pts["B"][0], max_w_pt / pts["E"][1])
 
 
-def draw_side(page, pts, origin, scale, labels=True):
+def draw_side(page, pts, origin, scale, labels=True, order=SIDE_ORDER):
     ox, oy = origin
     pp = {k: pymupdf.Point(ox + d * scale, oy - h * scale) for k, (h, d) in pts.items()}
-    poly = [pp[k] for k in SIDE_ORDER] + [pp["A"]]
+    poly = [pp[k] for k in order] + [pp["A"]]
     page.draw_polyline(poly, color=BLACK, fill=TAN, width=1.0, closePath=True)
     if labels:
-        for k in SIDE_ORDER:
+        for k in order:
             text(page, pp[k].x + 3, pp[k].y - 3, k, 8, "hebo", RED)
             page.draw_circle(pp[k], 1.6, color=RED, fill=RED)
     return pp
@@ -454,6 +624,8 @@ def draw_side(page, pts, origin, scale, labels=True):
 
 def draw_recess(page, b, origin, scale, labels=True):
     """Recess parts inside the side panel, and the opening in the front frame."""
+    if not b.recess:
+        return
     ox, oy = origin
     P = lambda hd: pymupdf.Point(ox + hd[1] * scale, oy - hd[0] * scale)
     r = b.recess_points()
@@ -477,7 +649,7 @@ def page_overview(doc, b):
 
     scale = fit_scale(b, 590, 150)
     origin = (90, 700)
-    pp = draw_side(page, pts, origin, scale)
+    pp = draw_side(page, pts, origin, scale, order=b.order)
     draw_recess(page, b, origin, scale)
     for pid, name, edge, ln, _ in b.cross_panels():
         a, c = edge.split("-")
@@ -503,7 +675,7 @@ def page_overview(doc, b):
         ("Overall depth", frac(pts["E"][1])),
         ("Inside width", frac(b.inner_width)),
         ("Outside width", f'{frac(b.inner_width)} + 2 x side thickness'),
-        ("Control deck height", f"~{frac(deck_h)} (7 deg tilt)"),
+        ("Control deck height", f"~{frac(deck_h)} above the table (7 deg tilt)" if b.table else f"~{frac(deck_h)} (7 deg tilt)"),
         ("Screen", b.screen),
         ("Material", b.material),
         ("Fasteners", "kids' plastic cardboard screws + glue"),
@@ -520,9 +692,10 @@ def page_overview(doc, b):
         "2  Side panel - measure-and-mark drawing\n"
         "3  Cut list (every part, every size)\n"
         "4  Cross panels - fold-flange layout\n"
-        "5  Control panel layout + hole schedule\n"
-        "6  Shopping list\n"
-        "7  Assembly steps\n\n"
+        "5  Back panel - doors, cable hole + vents\n"
+        "6  Control panel layout + hole schedule\n"
+        "7  Shopping list\n"
+        "8  Assembly steps\n\n"
         f"1:1 print-and-tape templates in {b.key}/templates/:\n"
         "  control-panel-1to1.pdf\n"
         "  speaker-cutouts-1to1.pdf\n"
@@ -530,7 +703,7 @@ def page_overview(doc, b):
 
     y += 185
     text(page, x0, y, "HOW THE CARDBOARD VERSION WORKS", 10, "hebo"); y += 6
-    box(page, pymupdf.Rect(x0, y, LETTER.width - 36, y + 220),
+    box(page, pymupdf.Rect(x0, y, LETTER.width - 36, y + 220), b.how or (
         "The original is 1/2\" plywood held together with wood screws "
         "driven into panel edges. Cardboard edges can't hold a screw, so "
         f"every cross panel (P2-P9) gets a {frac(b.flange)} flange folded down on each "
@@ -539,9 +712,9 @@ def page_overview(doc, b):
         "That's exactly the joint kids' cardboard screw kits are made for.\n\n"
         + (f"Everything is the original at {b.scale:.0%} - except the controls. "
            "Arcade buttons and joysticks don't shrink, so the deck has its own "
-           "compact 2-player layout (page 5)." if b.scale != 1 else
+           "compact 2-player layout (page 6)." if b.scale != 1 else
            "Side panel shape, panel lengths and control layout are the "
-           "original's. Only the joinery changes."), 8)
+           "original's. Only the joinery changes.")), 8)
     return page
 
 
@@ -555,10 +728,11 @@ def page_side(doc, b):
     header(page, "P1  Side panel  (make 2)", "Draw it straight onto the cardboard with a tape measure and a long straightedge. Every edge is a straight line.")
     scale = fit_scale(b, 560, 200)
     origin = (70, 700)
-    pp = draw_side(page, pts, origin, scale)
+    pp = draw_side(page, pts, origin, scale, order=b.order)
     draw_recess(page, b, origin, scale)
+    ff = b.floor_front
     dim_line(page, pp["A"], pp["B"], frac(pts["B"][0]), off=-18)
-    dim_line(page, pp["H"], pp["A"], frac(pts["H"][1]), off=-16)
+    dim_line(page, pp[ff], pp["A"], frac(pts[ff][1]), off=-16)
     dim_line(page, pp["B"], pp["C"], frac(pts["C"][1]), off=-16)
     dim_line(page, pp["E"], pp["F"], frac(edge_len(pts, "E", "F")), off=-14)
     if b.shelf_h > 1.5:
@@ -581,12 +755,12 @@ def page_side(doc, b):
     y += 4
     page.draw_line((x0, y), (LETTER.width - 36, y), color=GREY, width=0.4)
     y += 12
-    what = {
+    what = b.point_desc or {
         "A": "floor, back corner", "B": "top, back corner", "C": "top, front corner",
         "D": "screen meets deck", "E": "deck, front edge", "F": "lip, bottom",
         "G": "under deck, inner", "H": "floor, front corner",
     }
-    for k in SIDE_ORDER:
+    for k in b.order:
         h, d = pts[k]
         text(page, cols[0], y, k, 9, "hebo", RED)
         text(page, cols[1], y, f"{frac(h)}  ({h:.2f})", 8)
@@ -594,10 +768,11 @@ def page_side(doc, b):
         text(page, cols[3], y, what[k], 7, color=GREY)
         y += 14
     y += 4
-    text(page, x0, y + 6, "INSIDE LINES (pencil only - where the recess parts go)", 7, "hebo"); y += 18
-    inner = {"S1": "P4a speaker shelf, back", "S2": "P4a speaker shelf, front", "M1": "P4b screen board, bottom",
+    inner = {} if not b.recess else {"S1": "P4a speaker shelf, back", "S2": "P4a speaker shelf, front", "M1": "P4b screen board, bottom",
              "M2": "P4b screen board, top", "R1": "P4c recess floor, back", "R2": "P4c recess floor, front"}
-    r = b.recess_points()
+    if inner:
+        text(page, x0, y + 6, "INSIDE LINES (pencil only - where the recess parts go)", 7, "hebo"); y += 18
+    r = b.recess_points() if b.recess else {}
     for k, label in inner.items():
         h, d = r[k]
         text(page, cols[0], y, k, 9, "hebo", BLUE)
@@ -607,10 +782,10 @@ def page_side(doc, b):
         y += 13
     y += 6
     box(page, pymupdf.Rect(x0, y, LETTER.width - 36, y + 280),
-        "Join the dots in order A-B-C-D-E-F-G-H-A with straight lines. Draw the "
-        "inside lines S1-S2, M1-M2 and R1-R2 on the INSIDE face: the recess parts' "
-        "flanges line up on them.\n\n"
-        f"Check your work: D-E should be {frac(edge_len(pts, 'D', 'E'))} long and "
+        f"Join the dots in order {'-'.join(b.order)}-A with straight lines. "
+        + ("Draw the inside lines S1-S2, M1-M2 and R1-R2 on the INSIDE face: the recess parts' "
+           "flanges line up on them.\n\n" if b.recess else "\n\n")
+        + f"Check your work: D-E should be {frac(edge_len(pts, 'D', 'E'))} long and "
         f"C-D {frac(edge_len(pts, 'C', 'D'))}. If not, a point is off.\n\n"
         "Second side: cut the first one out, flip it over, and trace it. "
         "The two sides are mirror images, so tracing the flipped panel "
@@ -619,7 +794,7 @@ def page_side(doc, b):
         "Stiffness: glue a second layer to each side (flutes crossed), "
         f"OR glue {frac(max(1.5, 3 * b.scale))} wide ribs of cardboard on the inside, keeping the "
         f"{frac(b.flange)} strip along every edge free for the flanges. See the "
-        "screw-length note on page 6 before you pick.\n\n" + b.nest_note, 8)
+        "screw-length note on page 7 before you pick.\n\n" + b.nest_note, 8)
     return page
 
 
@@ -633,33 +808,7 @@ def page_cutlist(doc, b):
     y += 4
     page.draw_line((36, y), (LETTER.width - 36, y), width=0.5)
     y += 12
-    pts = b.side_points()
-    deck = edge_len(pts, "D", "E")
-    top, side, tab = b.beam()
-    beam_len = 2 * top + 2 * side + tab
-    bw = f"{frac(beam_len)} x {frac(b.blank_width)}"
-    rows = [("P1", "Side panel", "2", f"{frac(pts['B'][0])} x {frac(pts['E'][1])}", "-",
-             "Shape on page 2. Mirror pair.")]
-    for pid, name, edge, ln, note in b.cross_panels():
-        rows.append((pid, name, "1", f"{frac(ln)} x {frac(b.blank_width)}", edge, note))
-        if pid == "P4":
-            for ipid, iname, (a, c), iln, inote, _ in b.inner_panels():
-                rows.append((ipid, iname, "1", f"{frac(iln)} x {frac(b.blank_width)}", f"{a}-{c}", inote))
-    rows += [
-        ("P10", "Screen shelf", "1", bw, "-",
-         f"Folds into a {frac(top)} deep x {frac(side)} thick box beam (page 4). Sits under the monitor; set its height on the dry-run."),
-        ("P11", "Lower shelf", "1", bw, "-",
-         (f"Same box beam, at {frac(b.shelf_h)} up. " if b.shelf_h > 1.5 else "Same box beam, low down. ")
-         + "Holds the computer and the ballast."),
-    ]
-    pid, name, qty, _, edge, note = b.deck_extra
-    rows.append((pid, name, qty, f"{frac(deck)} x {frac(b.inner_width)}", edge, note))
-    rows.append(("P13", "Corner strips", "8", f'{frac(max(1.5, 2 * b.scale))} x {frac(b.inner_width)}', "-",
-                 "Folded into L-angles and glued into inside corners that feel loose."))
-    if b.cover:
-        rows.append(("P14", "Screen cover", "1", f'{frac(23.21 * b.scale)} x {frac(b.inner_width)}', "-",
-                     "Optional. Original is 1/4\" dark-tint acrylic. Clear PET sheet works."))
-    for r in rows:
+    for r in cardboard_rows(b):
         text(page, cols[0], y, r[0], 8, "hebo", RED)
         text(page, cols[1], y, r[1], 8)
         text(page, cols[2], y, r[2], 8)
@@ -668,7 +817,50 @@ def page_cutlist(doc, b):
         rc = box(page, pymupdf.Rect(cols[5], y - 8, LETTER.width - 36, y + 40), r[5], 7, color=GREY)
         y += max(18, 48 - rc + 6)
         page.draw_line((36, y - 9), (LETTER.width - 36, y - 9), color=LIGHT, width=0.3)
+    return page_cutlist_notes(page, b, y)
 
+
+def cardboard_rows(b):
+    """The cardboard cut list: (part, name, qty, size, edge, note)."""
+    pts = b.side_points()
+    deck = edge_len(pts, "D", "E")
+    top, side, tab = b.beam()
+    beam_len = 2 * top + 2 * side + tab
+    bw = f"{frac(beam_len)} x {frac(b.blank_width)}"
+    if b.recess:
+        sd, ss = b.screen_shelf_depth(), b.screen_shelf_side()
+        sw = f"{frac(2 * sd + 2 * ss + tab)} x {frac(b.blank_width)}"
+    rows = [("P1", "Side panel", "2", f"{frac(pts['B'][0])} x {frac(pts['E'][1])}", "-",
+             "Shape on page 2. Mirror pair.")]
+    for pid, name, edge, ln, note in b.cross_panels():
+        rows.append((pid, name, "1", f"{frac(ln)} x {frac(b.blank_width)}", edge, note))
+        if pid == "P4":
+            for ipid, iname, (a, c), iln, inote, _ in b.inner_panels():
+                rows.append((ipid, iname, "1", f"{frac(iln)} x {frac(b.blank_width)}", f"{a}-{c}", inote))
+    lg = b.ledge()
+    rows += [
+        ("P10", "Monitor ledge", "1", f"{frac(2 * lg['leg'])} x {frac(lg['width'])}", "-",
+         f"Fold lengthwise into a {frac(lg['leg'])} + {frac(lg['leg'])} L. Glue one leg to the back of P4 right "
+         "under the window, between the speakers; the monitor stands on the other. Two layers, flutes crossed."),
+    ] if not b.recess else [
+        ("P10", "Screen shelf", "1", sw, "-",
+         f"Folds into a {frac(sd)} deep x {frac(ss)} thick box beam (page 4), smaller than P11 so it fits between the back and the screen board. Sits under the monitor; set its height on the dry-run."),
+    ]
+    if b.shelf:
+        rows.append(("P11", "Lower shelf", "1", bw, "-",
+                     (f"Same box beam, at {frac(b.shelf_h)} up. " if b.shelf_h > 1.5 else "Same box beam, low down. ")
+                     + "Holds the computer and the ballast."))
+    pid, name, qty, _, edge, note = b.deck_extra
+    rows.append((pid, name, qty, f"{frac(deck)} x {frac(b.inner_width)}", edge, note))
+    rows.append(("P13", "Corner strips", "8", f'{frac(max(1.5, 2 * b.scale))} x {frac(b.inner_width)}', "-",
+                 "Folded into L-angles and glued into inside corners that feel loose."))
+    if b.cover:
+        rows.append(("P14", "Screen cover", "1", f'{frac(23.21 * b.scale)} x {frac(b.inner_width)}', "-",
+                     "Optional. Original is 1/4\" dark-tint acrylic. Clear PET sheet works."))
+    return rows
+
+
+def page_cutlist_notes(page, b, y):
     y += 6
     box(page, pymupdf.Rect(36, y, LETTER.width - 36, y + 150),
         b.stock_note + "\n\n"
@@ -682,7 +874,8 @@ def page_cutlist(doc, b):
 
 def page_flanges(doc, b):
     page = doc.new_page(width=LETTER.width, height=LETTER.height)
-    header(page, "Cross panels - fold-flange layout", "The same pattern for P2-P9. Score, fold 90 degrees, screw to the side panels.")
+    last = b.cross_panels()[-1][0]
+    header(page, "Cross panels - fold-flange layout", f"The same pattern for P2-{last}. Score, fold 90 degrees, screw to the side panels.")
     W, F = b.blank_width, b.flange
     s = 200 / W
     x, y = 60, 110
@@ -721,6 +914,9 @@ def page_flanges(doc, b):
     text(page, sx + 12, sy + 50, "flange", 7)
     text(page, sx + 30, sy + 64, "screw + nut (blue)", 7, color=BLUE)
 
+    if not b.recess:
+        page_ledge(page, b, r.y1 + 60)
+        return page
     # Box-beam shelf: top (with end flanges) / front / bottom / back / glue tab
     top, side, tab = b.beam()
     beam_len = 2 * top + 2 * side + tab
@@ -750,9 +946,90 @@ def page_flanges(doc, b):
         f"{frac(top)} x {frac(side)} tube and glue the tab to the underside of the top. "
         "A closed tube is what makes a cardboard shelf stiff enough to hold a "
         "monitor. The end flanges screw to the side panels.\n\n"
-        "Screen shelf: set its height so the monitor sits centred behind the "
-        "P4b window. Stand the monitor on it with its own stand removed, and strap "
+        f"Screen shelf (P10): it only carries the monitor, so make the top and bottom strips "
+        f"{frac(b.screen_shelf_depth())} and the front and back {frac(b.screen_shelf_side())}, so it fits between the back panel and the screen board. Set its height so the "
+        "monitor sits centred behind the P4b window. Stand the monitor on it with its own stand removed, and strap "
         "the monitor back to the shelf or to P2 so it can't slide forward.", 8)
+    return page
+
+
+def page_ledge(page, b, y):
+    """P10 on the bartop: a folded L-angle the monitor stands on."""
+    lg = b.ledge()
+    w, leg = lg["width"], lg["leg"]
+    text(page, 60, y, "P10  MONITOR LEDGE", 11, "hebo")
+    y += 30
+    s = 170 / (2 * leg + w) * 1.6
+    r = pymupdf.Rect(60, y, 60 + w * s, y + 2 * leg * s)
+    page.draw_rect(r, color=BLACK, width=1, fill=TAN)
+    page.draw_line((r.x0, r.y0 + leg * s), (r.x1, r.y0 + leg * s), color=RED, width=0.8, dashes="[4 2] 0")
+    text(page, r.x0 + 6, r.y0 + leg * s / 2 + 3, "glues to P4", 7, color=GREY)
+    text(page, r.x0 + 6, r.y0 + leg * s * 1.5 + 3, "monitor stands here", 7, color=GREY)
+    dim_line(page, (r.x0, r.y0), (r.x1, r.y0), frac(w), off=-12)
+    dim_line(page, (r.x1, r.y0), (r.x1, r.y0 + leg * s), frac(leg), off=-14)
+    dim_line(page, (r.x1, r.y0 + leg * s), (r.x1, r.y1), frac(leg), off=-14)
+    box(page, pymupdf.Rect(60, r.y1 + 16, LETTER.width - 36, r.y1 + 150),
+        f"Cut two {frac(w)} x {frac(2 * leg)} strips and glue them together with the flutes crossed. Score the "
+        "red line and fold to 90 degrees. Glue the top leg flat to the back of P4, its fold right at the bottom "
+        "edge of the window, centred between the speaker holes. The monitor stands on the other leg, face "
+        "against the window; a Velcro strip across its top holds it to P4. It only has to carry a 0.7 kg "
+        "portable monitor, so no shelf is needed.", 8)
+
+
+def page_back(doc, b):
+    page = doc.new_page(width=LETTER.width, height=LETTER.height)
+    header(page, "P2  Back panel - doors, cable hole + vents",
+           "Cut these before the back goes on. Measured on the outside face: across from the left fold, up from the floor (A) edge.")
+    o = b.back_openings()
+    W, F, Lb = b.inner_width, b.flange, b.side_points()["B"][0]
+    sc = min(230 / (W + 2 * F), 560 / Lb)
+    ox, oy = 50 + F * sc, 110 + Lb * sc
+    R = lambda x0, s0, x1, s1: pymupdf.Rect(ox + x0 * sc, oy - s1 * sc, ox + x1 * sc, oy - s0 * sc)
+    page.draw_rect(R(-F, 0, W + F, Lb), color=BLACK, fill=TAN, width=1)
+    for fx in (0, W):
+        page.draw_line((ox + fx * sc, oy - Lb * sc), (ox + fx * sc, oy), color=RED, width=0.8, dashes="[4 2] 0")
+    text(page, ox + 3, oy + 12, "A - floor edge", 7, "hebo", GREY)
+    text(page, ox + 3, oy - Lb * sc - 4, "B - top edge", 7, "hebo", GREY)
+    for pid, name, (x0, s0, x1, s1), note in o["doors"]:
+        rr = R(x0, s0, x1, s1)
+        page.draw_rect(rr, color=BLACK, fill=(1, 1, 1), width=0.9)
+        if note.startswith("Hinged"):
+            page.draw_line((rr.x0, rr.y1), (rr.x1, rr.y1), color=BLUE, width=2.2)
+        lab = f"{pid} {name}"
+        w = pymupdf.get_text_length(lab, "hebo", 7)
+        text(page, (rr.x0 + rr.x1) / 2 - w / 2, (rr.y0 + rr.y1) / 2 + 3, lab, 7, "hebo", GREY)
+        dim_line(page, (rr.x0, rr.y0), (rr.x1, rr.y0), frac(x1 - x0), off=-8)
+        dim_line(page, (rr.x1, rr.y0), (rr.x1, rr.y1), frac(s1 - s0), off=-10)
+    for cx, cy, dia in [o["cable"]] + o["vents"]:
+        c = pymupdf.Point(ox + cx * sc, oy - cy * sc)
+        page.draw_circle(c, dia / 2 * sc, color=BLACK, fill=(1, 1, 1), width=0.9)
+
+    x0, y = 330, 100
+    text(page, x0, y, "WHERE EACH ONE GOES", 10, "hebo"); y += 8
+    lines = []
+    for pid, name, (a, s0, c, s1), note in o["doors"]:
+        lines.append(f"{pid} {name}: {frac(c - a)} wide x {frac(s1 - s0)} tall, centred, bottom edge "
+                     f"{frac(s0)} up. {note}")
+    cx, cy, dia = o["cable"]
+    lines.append(f"Cable hole: {frac(dia)} circle, centred, {frac(cy)} up to its middle.")
+    v = o["vents"]
+    lines.append(f"Vents: {len(v)} holes of {frac(v[0][2])}, {frac(v[1][0] - v[0][0])} apart, centred, "
+                 f"{frac(v[0][1])} up to their middles.")
+    rc = box(page, pymupdf.Rect(x0, y, LETTER.width - 36, y + 200), "\n\n".join(lines), 8)
+    y += 200 - rc + 26
+    text(page, x0, y, "HOW TO CUT THEM", 10, "hebo"); y += 8
+    box(page, pymupdf.Rect(x0, y, LETTER.width - 36, y + 330),
+        "Doors: cut three sides and score the hinge side (thick blue line) so the piece you cut out folds "
+        "down and becomes the door. Glue a 1 1/2\" strip of cardboard round the inside of the opening, like a "
+        "picture frame: the back panel is what keeps the cabinet square, and the frame gives that back. "
+        "Velcro at the top keeps it shut.\n\n"
+        + ("Hatch: cut all four sides and keep the piece. Glue the frame strip so it sticks 1/2\" into the "
+           "opening; the hatch sits on it and 4 kit screws hold it. It lets you reach the monitor's cables.\n\n"
+           if len(o["doors"]) > 1 else "")
+        + "Cable hole: one power lead (or the controllers' USB leads) comes out here. Wrap tape round the edge "
+        "so it doesn't fray. Plug everything inside into one power strip.\n\n"
+        "Vents: warm air rises, so they sit at the top. Don't cover them.\n\n"
+        f"Leave at least 2\" of solid board between any opening and the {frac(F)} fold flanges.", 8)
     return page
 
 
@@ -867,17 +1144,17 @@ def page_assembly(doc, b):
                  "Glue the doublers under P5. When dry, tape on the 1:1 template and cut all the holes. Mount joysticks and buttons now - much easier on the bench."
                  if b.scale == 1 else
                  "Cut every hole in the Foamex plate from the 1:1 template, lay it on P5 and mark through. Cut P5's holes plus a bigger opening under each stick. Bolt plate + P5 together at the corners, then mount sticks and buttons on the bench.")
-    steps = [
-        ("Test the screws", "Screw scrap to scrap in the exact layers you'll use (page 6 note)."),
+    steps = list(b.steps) if b.steps else [
+        ("Test the screws", "Screw scrap to scrap in the exact layers you'll use (page 7 note)."),
         ("Draw + cut the sides (P1)", "Page 2. Cut one, flip it, trace the second. Laminate or rib them. Label the insides 'LEFT' and 'RIGHT'."),
-        ("Cut + score cross panels (P2-P9)", "Page 3 sizes, page 4 flanges. Score with the flutes, fold every flange to 90 deg."),
+        ("Cut + score cross panels (P2-P9)", "Page 3 sizes, page 4 flanges. Cut the back's doors, cable hole and vents now (page 5). Score with the flutes, fold every flange to 90 deg."),
         deck_step,
         ("Stand the back up (P2)", "Lay one side flat, inside face up. Place P2 along edge A-B, flanges down against the side. Punch + screw."),
         ("Floor + top (P9, P3)", "Add P9 on H-A and P3 on B-C. You now have a rigid 'C'. Add the second side on top and screw all three."),
         ("Stand it up + add the front", "Stand the cabinet up. Screw in P8, P7, P6 and P5 (control deck, pre-wired). Then the recess, painted black first: P4c floor, P4b screen board, P4a speaker shelf. Last, P4 - the front frame - as one flat piece over the lot."),
         ("Shelves (P10, P11)", "Fold the box beams, screw their flanges in: lower shelf at the marked line, screen shelf so the monitor centres in the window."),
         ("Weight + anchor", f"Put {b.ballast} BEFORE the monitor goes in." + (" Strap the top to a wall stud with an anti-tip furniture strap." if b.scale >= 0.75 else "")),
-        ("Electronics", "Computer on the lower shelf, encoder under the deck, monitor on its shelf. Run cables out through the service door."),
+        ("Electronics", "Computer on the lower shelf, encoder under the deck, monitor on its shelf. One power lead out through the cable hole."),
         ("Glue + finish", "Once it all works, back out one screw at a time, run glue into the joint, re-screw. Tape the edges, then paint or wrap it. Put Supercade art on the sides!"),
     ]
     y = 100
@@ -890,7 +1167,7 @@ def page_assembly(doc, b):
         rc = box(page, pymupdf.Rect(64, y + 4, LETTER.width - 36, y + 50), d, 8, color=(0.2, 0.2, 0.2))
         y += 4 + (46 - rc) + 16
     y += 6
-    safety = ("SAFETY. This is a tall, narrow box with a screen near the top: it WILL tip if "
+    safety = b.safety or ("SAFETY. This is a tall, narrow box with a screen near the top: it WILL tip if "
               "it isn't weighted and strapped. Keep it strapped to the wall whenever kids are around "
               "it. Box-cutter work is for adults. Keep the power strip off the floor and don't block "
               "the monitor's vents." if b.scale >= 0.75 else
@@ -904,12 +1181,12 @@ def page_assembly(doc, b):
 
 def build_plans(b):
     doc = pymupdf.open()
-    for fn in (page_overview, page_side, page_cutlist, page_flanges, page_control, page_shopping, page_assembly):
+    for fn in (page_overview, page_side, page_cutlist, page_flanges, page_back, page_control, page_shopping, page_assembly):
         fn(doc, b)
     for i, page in enumerate(doc, 1):
         footer(page, i, len(doc), b.title)
     doc.set_metadata({"title": f"Supercade cardboard plans - {b.title}", "author": "Super Labs"})
-    out = os.path.join(HERE, b.key, b.filename)
+    out = os.path.join(PLANS, b.key, b.filename)
     doc.save(out, garbage=4, deflate=True)
     return out
 
@@ -1023,18 +1300,17 @@ def cp_drawer(cp):
 
 
 def speaker_drawer(b):
-    w, h = SPEAKER_W * b.scale, SPEAKER_H * b.scale
+    w = h = b.speaker_d
 
     def draw(page, ox, oy):
         for i in range(2):
             cx, cy = ox + (w / 2 + 0.5) * PT, oy + (h / 2 + 0.3 + i * (h + 0.5)) * PT
-            r = pymupdf.Rect(cx - w / 2 * PT, cy - h / 2 * PT, cx + w / 2 * PT, cy + h / 2 * PT)
-            page.draw_oval(r, color=BLACK, width=1)
+            page.draw_circle((cx, cy), w / 2 * PT, color=BLACK, width=1)
             page.draw_line((cx - 8, cy), (cx + 8, cy), color=GREY, width=0.5)
             page.draw_line((cx, cy - 8), (cx, cy + 8), color=GREY, width=0.5)
-            lab = f"speaker {frac(w)} x {frac(h)}"
+            lab = f"speaker hole {frac(w)} ({round(w * 25.4 / 5) * 5:g} mm)"
             text(page, cx - pymupdf.get_text_length(lab, "helv", 8) / 2, cy + 20, lab, 8, color=GREY)
-        text(page, ox + 0.2 * PT, oy + (2 * h + 1.2) * PT, "Cut 2 in P4a, the speaker shelf, so they point down at the players. Skip if your monitor has speakers.", 7, color=GREY)
+        text(page, ox + 0.2 * PT, oy + (2 * h + 1.2) * PT, b.speaker_note, 7, color=GREY)
     return draw, w + 1.0, 2 * h + 1.5
 
 
@@ -1045,16 +1321,16 @@ def side_drawer(b):
 
     def draw(page, ox, oy):
         P = {k: pymupdf.Point(ox + d * PT, oy + (H - h) * PT) for k, (h, d) in pts.items()}
-        poly = [P[k] for k in SIDE_ORDER] + [P["A"]]
+        poly = [P[k] for k in b.order] + [P["A"]]
         page.draw_polyline(poly, color=BLACK, width=1.4, closePath=True)
-        for k in SIDE_ORDER:
+        for k in b.order:
             page.draw_circle(P[k], 4, color=RED, width=0.8)
             text(page, P[k].x + 6, P[k].y - 6, k, big, "hebo", RED)
         if b.shelf_h > 1.5:
             y = oy + (H - b.shelf_h) * PT
             page.draw_line((ox + 1.9 * b.scale * PT, y), (ox + 11.9 * b.scale * PT, y), color=GREY, width=1, dashes="[6 4] 0")
             text(page, ox + 2 * b.scale * PT, y - 4, "lower shelf (top face)", 9, color=GREY)
-        r = b.recess_points()
+        r = b.recess_points() if b.recess else {}
         Q = lambda k: pymupdf.Point(ox + r[k][1] * PT, oy + (H - r[k][0]) * PT)
         for pid, _, (ka, kc), _, _, _ in b.inner_panels():
             page.draw_line(Q(ka), Q(kc), color=BLUE, width=1.2, dashes="[8 4] 0")
@@ -1064,7 +1340,7 @@ def side_drawer(b):
             m = (Q(ka) + Q(kc)) / 2
             text(page, m.x + 6, m.y - 6, f"{pid} line (inside face)", 9, color=BLUE)
         text(page, ox + 0.8 * PT, oy + 2 * PT, "TOP", big, "hebo", GREY)
-        text(page, ox + 0.8 * PT, oy + (H - 1.2) * PT, "FLOOR", big, "hebo", GREY)
+        text(page, ox + 0.8 * PT, oy + (H - 1.2) * PT, "TABLE (bottom edge)" if b.table else "FLOOR", big, "hebo", GREY)
         text(page, ox + 0.5 * PT, oy + H / 2 * PT, "BACK edge", 12, "hebo", GREY, rotate=90)
         text(page, ox + 2 * PT, oy + (H * 0.8) * PT, "flutes run up and down", 10, color=GREY)
     return draw, pts["E"][1], H
@@ -1305,7 +1581,7 @@ def build_control_box(b):
     for i, page in enumerate(doc, 1):
         footer(page, i, len(doc), "control box")
     doc.set_metadata({"title": "Supercade control box", "author": "Super Labs"})
-    out = os.path.join(HERE, b.key, "SuperCade-Control-Box.pdf")
+    out = os.path.join(PLANS, b.key, "SuperCade-Control-Box.pdf")
     doc.save(out, garbage=4, deflate=True)
     return out
 
@@ -1318,7 +1594,7 @@ VIEWER_BUILDS = (
     # (id, label, build index in BUILDS, screen visible area in inches)
     ("full", "Full size", 1, (23.5, 13.25)),
     ("kid", "Kid height", 2, (23.5, 13.25)),
-    ("half", "Half scale", 0, (11.625, 6.5)),
+    ("bartop", "Mini", 0, (11.625, 6.5)),
 )
 
 
@@ -1338,11 +1614,27 @@ def viewer_panels(b, screen):
         dh, dd = h2 - h1, d2 - d1
         item = {"id": pid, "name": name, "a": R(pts[a]), "b": R(pts[c]), "length": round(ln, 3),
                 "out": [round(dd / ln, 4), round(-dh / ln, 4)], "note": note}
-        if pid == "P4":
+        if pid == "P4" and b.recess:
             s0, s1, border = b.frame_opening()
             item["holes"] = [{"rect": [round(border, 3), round(s0, 3), round(W - border, 3), round(s1, 3)]}]
-        if pid == "P9":
+        if pid == "P4" and not b.recess:
+            # the flat front board carries the screen window and both speakers
+            fl = b.front_layout()
+            w0, w1 = fl["window"]
+            sw_, sh_ = screen
+            ow = oh = b.speaker_d
+            item["holes"] = [{"rect": [round((W - sw_) / 2, 3), round(w0, 3), round((W + sw_) / 2, 3), round(w1, 3)]}] + [
+                {"oval": [round(x, 3), round(fl["speakers"], 3), round(ow, 3), round(oh, 3)]} for x in (W * 0.22, W * 0.78)]
+            item["screen"] = True
+            item["screenAt"] = round((w0 + w1) / 2, 3)
+        if pid == "P2":
+            o = b.back_openings()
+            item["holes"] = [{"rect": [round(v, 3) for v in rect]} for _, _, rect, _ in o["doors"]] + [
+                {"oval": [round(cx, 3), round(cy, 3), dia, dia]} for cx, cy, dia in [o["cable"]] + o["vents"]]
+            item["doors"] = [{"id": did, "name": name, "rect": [round(v, 3) for v in rect]} for did, name, rect, _ in o["doors"]]
+        if edge == f"{b.floor_front}-A":
             item["explode"] = [0, 1]          # slide the floor out the front, not through the mat
+            item["floor"] = True
         out.append(item)
     sw, sh = screen
     for pid, name, (a, c), ln, note, normal in b.inner_panels():
@@ -1352,11 +1644,68 @@ def viewer_panels(b, screen):
             item["holes"] = [{"rect": [round((W - sw) / 2, 3), round((ln - sh) / 2, 3), round((W + sw) / 2, 3), round((ln + sh) / 2, 3)]}]
             item["screen"] = True
         if pid == "P4a":
-            ow, oh = SPEAKER_W * b.scale, SPEAKER_H * b.scale
+            ow = oh = b.speaker_d
             item["holes"] = [{"oval": [round(x, 3), round(ln / 2, 3), round(ow, 3), round(oh, 3)]}
                              for x in (W * 0.22, W * 0.78)]
         out.append(item)
     return out
+
+
+# Where the builder links its downloads from, relative to viewer/index.html.
+DOWNLOAD_BASE = "../"
+CAD_DIR = os.path.join(OUT, "cad")
+MATERIAL_NAMES = {"cardboard": "Cardboard", "plastic": "Plastic (PVC foam board)", "wood": "Wood (plywood)"}
+
+
+def export_make(b, vid, screen):
+    """Cut files + parts lists for each material this build can be made from."""
+    os.makedirs(CAD_DIR, exist_ok=True)
+    panels = viewer_panels(b, screen)
+    electronics = next(g for g in b.shopping if g[0].startswith("CONTROLS"))
+    plans = [{"label": "Plans (PDF)", "href": f"{DOWNLOAD_BASE}{b.key}/{b.filename}"}]
+    templates = [
+        {"label": "Control deck template, 1:1 (PDF)", "href": f"{DOWNLOAD_BASE}{b.key}/templates/control-panel-1to1.pdf"},
+        {"label": "Side panel template, 1:1 (PDF)", "href": f"{DOWNLOAD_BASE}{b.key}/templates/side-panel-1to1{suffix(b)}.pdf"},
+        {"label": "Speaker holes, 1:1 (PDF)", "href": f"{DOWNLOAD_BASE}{b.key}/templates/speaker-cutouts-1to1.pdf"},
+    ]
+    make = {}
+    for m in fab.materials_for(b):
+        stock_name, thick, sheet = fab.STOCK[(m, fab.size_class(b))]
+        parts = fab.build_parts(b, panels, m, frac)
+        body = [p for p in parts if p["stock"] == "body"]
+        deck = [p for p in parts if p["stock"] == "deck"]
+        sheets = fab.nest(body, sheet)
+        groups = [(sheets, sheet, stock_name)]
+        if deck:
+            groups.append((fab.nest(deck, (18, 12)), (18, 12), "5 mm Foamex"))
+        prims = fab.layout(groups)
+        base = f"supercade-{vid}-{m}"
+        fab.write_svg(os.path.join(CAD_DIR, base + ".svg"), prims, f"Supercade {b.title}, {MATERIAL_NAMES[m]}")
+        fab.write_dxf(os.path.join(CAD_DIR, base + ".dxf"), prims)
+        files = [
+            {"label": "Cut file for CNC / laser (DXF)", "href": f"{DOWNLOAD_BASE}cad/{base}.dxf"},
+            {"label": "Cut file, printable / Cricut (SVG)", "href": f"{DOWNLOAD_BASE}cad/{base}.svg"},
+        ]
+        if m == "cardboard":
+            cut = [{"id": r[0], "name": r[1], "qty": int(r[2]), "size": r[3], "note": r[5]} for r in cardboard_rows(b)]
+            buy = b.shopping
+            files = plans + ([{"label": "Control box plans (PDF)", "href": f"{DOWNLOAD_BASE}{b.key}/SuperCade-Control-Box.pdf"}]
+                             if b.control_box else []) + templates + files
+            note = "Fold-flange panels and kit screws. The PDF plans walk through every step."
+        else:
+            cut = fab.cut_rows(parts, frac)
+            buy = fab.buy_list(b, m, sheets, electronics)
+            files = files + plans + templates[:1]
+            note = (f"{stock_name.split(',')[0]}: panels are cut to the {frac(b.inner_width)} inside width and "
+                    + ("glued + screwed to battens" if m == "wood" else "glued to angle and bolted")
+                    + ". Sizes are on the outside face; trim corners on the dry fit.")
+        make[m] = {
+            "name": MATERIAL_NAMES[m], "thickness": round(thick, 3), "sheets": len(sheets),
+            "sheet": stock_name, "note": note, "cut": cut,
+            "buy": [{"group": g, "items": [{"name": n, "note": t} for n, t in items]} for g, items in buy],
+            "files": files,
+        }
+    return make
 
 
 def export_viewer_data():
@@ -1374,10 +1723,14 @@ def export_viewer_data():
             "innerWidth": round(b.inner_width, 3),
             "flange": b.flange,
             "side": {k: [round(h, 3), round(d, 3)] for k, (h, d) in pts.items()},
-            "order": SIDE_ORDER,
+            "order": b.order,
+            "table": b.table,
             "shelfH": round(b.shelf_h, 3),
             "beam": [top, side],
+            "screenBeam": [b.screen_shelf_depth(), b.screen_shelf_side()] if b.recess else None,
+            "ledge": dict(b.ledge(), at=b.front_layout()["monitor_bottom"]) if not b.recess else None,
             "panels": viewer_panels(b, screen),
+            "make": export_make(b, vid, screen),
             "screen": list(screen),
             "controls": {
                 "width": round(cp.width, 3), "height": round(cp.height, 3),
@@ -1388,15 +1741,15 @@ def export_viewer_data():
     # People for scale: CC0 bodies from Blender Studio's Human Base Meshes, packed
     # into a script so the viewer also works when opened straight from disk.
     people = {}
-    for pid in ("adult", "kid8", "kid5"):
+    for pid in ("adult", "kid5"):             # the viewer makes the 8-year-old from the adult
         glb = os.path.join(HERE, "viewer", "people", pid + ".glb")
         if os.path.exists(glb):
             with open(glb, "rb") as f:
                 people[pid] = base64.b64encode(f.read()).decode("ascii")
-    with open(os.path.join(HERE, "viewer", "people.js"), "w") as f:
+    with open(os.path.join(BUILDER, "people.js"), "w") as f:
         f.write("// Generated by generate.py from viewer/people/*.glb (CC0, Blender Studio Human Base Meshes).\n")
         f.write("window.SUPERCADE_PEOPLE = " + json.dumps(people) + ";\n")
-    path = os.path.join(HERE, "viewer", "data.js")
+    path = os.path.join(BUILDER, "data.js")
     os.makedirs(os.path.dirname(path), exist_ok=True)
     with open(path, "w") as f:
         f.write("// Generated by generate.py - do not edit by hand.\n")
@@ -1407,7 +1760,7 @@ def export_viewer_data():
 def main():
     made = []
     for b in BUILDS:
-        tdir = os.path.join(HERE, b.key, "templates")
+        tdir = os.path.join(PLANS, b.key, "templates")
         os.makedirs(tdir, exist_ok=True)
         made.append(build_plans(b))
         if b.control_box:

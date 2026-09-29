@@ -1,0 +1,90 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="59.000in" height="50.500in" viewBox="0 0 59.000 50.500">
+<title>Supercade Mini bartop, Cardboard</title>
+<!-- 1:1, 1 user unit = 1 inch. Black = cut, red dashed = score/fold, grey = stock sheet. -->
+<g fill="none" stroke-linejoin="round">
+<polygon points="0.0000,50.0000 36.0000,50.0000 36.0000,2.0000 0.0000,2.0000" stroke="#bbbbbb" stroke-width="0.03"/>
+<polygon points="0.3750,49.6250 0.3750,32.8498 4.5280,32.8498 7.3750,43.4750 14.6950,44.3750 14.6950,45.8750 13.4450,49.6250" stroke="#000000" stroke-width="0.01"/>
+<polygon points="20.6505,32.8498 20.6505,49.6250 16.4975,49.6250 13.6505,38.9998 6.3305,38.0998 6.3305,36.5998 7.5805,32.8498" stroke="#000000" stroke-width="0.01"/>
+<polygon points="0.3750,32.4748 17.8750,32.4748 17.8750,15.6998 0.3750,15.6998" stroke="#000000" stroke-width="0.01"/>
+<polygon points="3.8750,30.2248 14.3750,30.2248 14.3750,18.6998 3.8750,18.6998" stroke="#000000" stroke-width="0.01"/>
+<circle cx="9.1250" cy="31.3748" r="0.7500" stroke="#000000" stroke-width="0.01"/>
+<circle cx="6.8750" cy="16.7998" r="0.3750" stroke="#000000" stroke-width="0.01"/>
+<circle cx="8.3750" cy="16.7998" r="0.3750" stroke="#000000" stroke-width="0.01"/>
+<circle cx="9.8750" cy="16.7998" r="0.3750" stroke="#000000" stroke-width="0.01"/>
+<circle cx="11.3750" cy="16.7998" r="0.3750" stroke="#000000" stroke-width="0.01"/>
+<line x1="1.8750" y1="32.4748" x2="1.8750" y2="15.6998" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<line x1="16.3750" y1="32.4748" x2="16.3750" y2="15.6998" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="34.0955,49.6250 34.0955,32.1250 21.0255,32.1250 21.0255,49.6250" stroke="#000000" stroke-width="0.01"/>
+<line x1="34.0955" y1="48.1250" x2="21.0255" y2="48.1250" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<line x1="34.0955" y1="33.6250" x2="21.0255" y2="33.6250" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="18.2500,31.7500 35.7500,31.7500 35.7500,20.7500 18.2500,20.7500" stroke="#000000" stroke-width="0.01"/>
+<polygon points="21.1880,30.7500 32.8120,30.7500 32.8120,24.2500 21.1880,24.2500" stroke="#000000" stroke-width="0.01"/>
+<circle cx="22.9400" cy="22.2500" r="1.0000" stroke="#000000" stroke-width="0.01"/>
+<circle cx="31.0600" cy="22.2500" r="1.0000" stroke="#000000" stroke-width="0.01"/>
+<line x1="19.7500" y1="31.7500" x2="19.7500" y2="20.7500" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<line x1="34.2500" y1="31.7500" x2="34.2500" y2="20.7500" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="18.2500,20.3750 35.7500,20.3750 35.7500,13.0000 18.2500,13.0000" stroke="#000000" stroke-width="0.01"/>
+<line x1="19.7500" y1="20.3750" x2="19.7500" y2="13.0000" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<line x1="34.2500" y1="20.3750" x2="34.2500" y2="13.0000" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="0.3750,15.3248 17.8750,15.3248 17.8750,11.1718 0.3750,11.1718" stroke="#000000" stroke-width="0.01"/>
+<line x1="1.8750" y1="15.3248" x2="1.8750" y2="11.1718" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<line x1="16.3750" y1="15.3248" x2="16.3750" y2="11.1718" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="18.2500,12.6250 35.7500,12.6250 35.7500,8.6720 18.2500,8.6720" stroke="#000000" stroke-width="0.01"/>
+<line x1="19.7500" y1="12.6250" x2="19.7500" y2="8.6720" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<line x1="34.2500" y1="12.6250" x2="34.2500" y2="8.6720" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="0.3750,10.7968 17.8750,10.7968 17.8750,9.2968 0.3750,9.2968" stroke="#000000" stroke-width="0.01"/>
+<line x1="1.8750" y1="10.7968" x2="1.8750" y2="9.2968" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<line x1="16.3750" y1="10.7968" x2="16.3750" y2="9.2968" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="0.3750,8.9218 5.8750,8.9218 5.8750,6.4218 0.3750,6.4218" stroke="#000000" stroke-width="0.01"/>
+<line x1="0.3750" y1="7.6718" x2="5.8750" y2="7.6718" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="6.2500,8.9218 11.7500,8.9218 11.7500,6.4218 6.2500,6.4218" stroke="#000000" stroke-width="0.01"/>
+<line x1="6.2500" y1="7.6718" x2="11.7500" y2="7.6718" stroke="#e03030" stroke-width="0.01" stroke-dasharray="0.25 0.12"/>
+<polygon points="40.0000,50.0000 58.0000,50.0000 58.0000,38.0000 40.0000,38.0000" stroke="#bbbbbb" stroke-width="0.03"/>
+<polygon points="40.3750,49.6250 54.8750,49.6250 54.8750,42.2499 40.3750,42.2499" stroke="#000000" stroke-width="0.01"/>
+<circle cx="42.1073" cy="44.9793" r="0.4921" stroke="#000000" stroke-width="0.01"/>
+<circle cx="41.2411" cy="46.5738" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="41.2411" cy="43.3848" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="42.9734" cy="46.5738" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="42.9734" cy="43.3848" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="44.3120" cy="45.2943" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="44.3120" cy="43.9951" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="45.4931" cy="45.6093" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="45.4931" cy="44.3100" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="46.6742" cy="45.6093" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="46.6742" cy="44.3100" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="44.7844" cy="47.9715" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="46.1230" cy="47.9715" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="49.3573" cy="44.9793" r="0.4921" stroke="#000000" stroke-width="0.01"/>
+<circle cx="48.4911" cy="46.5738" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="48.4911" cy="43.3848" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="50.2234" cy="46.5738" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="50.2234" cy="43.3848" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="51.5620" cy="45.2943" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="51.5620" cy="43.9951" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="52.7431" cy="45.6093" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="52.7431" cy="44.3100" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="53.9242" cy="45.6093" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="53.9242" cy="44.3100" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="52.0344" cy="47.9715" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="53.3730" cy="47.9715" r="0.4724" stroke="#000000" stroke-width="0.01"/>
+<circle cx="47.6250" cy="47.9715" r="0.3740" stroke="#000000" stroke-width="0.01"/>
+<circle cx="40.7687" cy="49.2313" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="54.4813" cy="49.2313" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="40.7687" cy="42.6436" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+<circle cx="54.4813" cy="42.6436" r="0.0984" stroke="#000000" stroke-width="0.01"/>
+</g>
+<text x="0.300" y="1.000" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">SHEET 1/2: Cardboard (box panels) (36 x 48 in)</text>
+<text x="7.427" y="42.668" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P1</text>
+<text x="12.599" y="39.807" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P1</text>
+<text x="8.625" y="24.087" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P2</text>
+<text x="27.060" y="40.875" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P8</text>
+<text x="26.500" y="26.250" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P4</text>
+<text x="26.500" y="16.688" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P5</text>
+<text x="8.625" y="13.248" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P3</text>
+<text x="26.500" y="10.648" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P7</text>
+<text x="8.625" y="10.047" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P6</text>
+<text x="2.625" y="7.672" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P10</text>
+<text x="8.500" y="7.672" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P10</text>
+<text x="40.300" y="37.000" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">SHEET 2/2: 5 mm Foamex (18 x 12 in)</text>
+<text x="47.125" y="45.937" font-family="Helvetica, Arial, sans-serif" font-size="0.6" fill="#2346c8">P12</text>
+</svg>

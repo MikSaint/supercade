@@ -6,7 +6,8 @@
 </head>
 <body>
 <!-- VIEWER:START -->
-<title>Supercade Flat-Pack</title>
+<title>Supercade Builder</title>
+<meta name="description" content="Build your own Supercade arcade cabinet: a 3D builder with plans, parts lists and cut files for cardboard, plastic or wood.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=Instrument+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
@@ -41,7 +42,8 @@
     overflow: hidden;
   }
   #stage { position: fixed; inset: 0; }
-  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #stage canvas.dragging { cursor: grabbing; }
 
   .panel {
     position: fixed;
@@ -57,7 +59,21 @@
     box-shadow: var(--shadow);
     overflow: hidden;
   }
-  .panel header { padding: 16px 18px 12px; border-bottom: 1px solid var(--rule); }
+  .panel header { position: relative; padding: 16px 18px 12px; border-bottom: 1px solid var(--rule); }
+  .collapse {
+    position: absolute; top: 12px; right: 12px;
+    width: 32px; height: 32px; border-radius: 8px;
+    border: 1px solid var(--rule); background: var(--paper); color: var(--ink);
+    display: grid; place-items: center; cursor: pointer; padding: 0;
+  }
+  .collapse:hover { border-color: var(--ink); }
+  .collapse svg { transition: transform .2s; }
+  /* collapsed: just the header, so the model gets the whole window */
+  .panel.collapsed { bottom: auto; }
+  .panel.collapsed header { border-bottom: 0; }
+  .panel.collapsed .scroll, .panel.collapsed .tag { display: none; }
+  .panel.collapsed .collapse svg { transform: rotate(180deg); }
+  .panel.collapsed ~ .hint { left: 16px; }
   .brand {
     margin: 0;
     font: 400 26px/1 var(--display);
@@ -65,7 +81,13 @@
     color: var(--ink);
   }
   .brand span { color: var(--accent); }
+  .brand button { all: unset; cursor: pointer; }
+  .brand button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .by { display: inline-block; margin-top: 6px; font: 500 11px/1 var(--mono); letter-spacing: .04em; color: var(--muted); text-decoration: none; }
+  .by:hover { color: var(--accent); }
+  .panel.collapsed .by { margin-top: 4px; }
   .tag { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+  .tag a { color: var(--accent); text-underline-offset: 2px; }
   .scroll { overflow-y: auto; padding: 6px 18px 18px; display: grid; gap: 16px; }
   .group { display: grid; gap: 8px; }
   .label {
@@ -115,6 +137,7 @@
   .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
   .swatches[data-off="true"] { opacity: .35; }
   .row { display: flex; align-items: center; gap: 10px; }
+  .row[hidden], .group[hidden] { display: none; }
   .row input[type="range"] { flex: 1; accent-color: var(--accent); }
   .toggle { display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; }
   .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
@@ -145,9 +168,33 @@
   .parts b { font: 500 12px/1 var(--mono); color: var(--accent); }
   .parts span.sz { font: 400 12px/1 var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 
+  .make-head { margin: 0; font-size: 13px; color: var(--muted); }
+  .make-head b { color: var(--ink); font-weight: 600; }
+  .files { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .files a {
+    display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+    padding: 8px 10px; border: 1px solid var(--rule); border-radius: 9px;
+    color: var(--ink); text-decoration: none; font-size: 13px; background: var(--paper);
+  }
+  .files a:hover { border-color: var(--ink); }
+  .files a small { font: 500 11px/1 var(--mono); color: var(--accent); }
+  details.make { border: 1px solid var(--rule); border-radius: 10px; background: var(--paper); }
+  details.make summary { cursor: pointer; padding: 9px 10px; font-weight: 600; font-size: 13px; }
+  details.make summary small { font: 400 11px/1 var(--mono); color: var(--muted); margin-left: 6px; }
+  details.make .parts { border: 0; border-top: 1px solid var(--rule); border-radius: 0 0 10px 10px; }
+  details.make .parts li { grid-template-columns: 38px 1fr auto; }
+  .parts .qty { font: 400 11px/1 var(--mono); color: var(--muted); }
+  .buy { border-top: 1px solid var(--rule); padding: 8px 10px 10px; display: grid; gap: 8px; }
+  .buy h4 { margin: 4px 0 0; font: 500 10px/1.2 var(--mono); letter-spacing: .08em; color: var(--muted); }
+  .buy p { margin: 0; font-size: 13px; }
+  .buy p span { display: block; color: var(--muted); font-size: 12px; }
+
   .hint {
     position: fixed;
     right: 16px;
+    left: 352px;                /* clear of the side panel */
+    width: fit-content;
+    margin-left: auto;
     bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     font: 400 12px/1.4 var(--mono);
     color: var(--muted);
@@ -156,6 +203,31 @@
     border-radius: 8px;
     padding: 6px 10px;
   }
+  /* The controls hint shrinks to a "?" once you start moving. Shrinking: the
+     text fades, then the box closes. Growing (hover): the box opens, then the
+     text fades in. */
+  .hint {
+    display: flex; align-items: center; gap: 8px;
+    overflow: hidden; max-width: 720px; max-height: 90px;
+    transition: max-width .45s cubic-bezier(.2,.8,.2,1), max-height .45s cubic-bezier(.2,.8,.2,1),
+                padding .45s cubic-bezier(.2,.8,.2,1), border-radius .45s;
+  }
+  .hint .q {
+    flex: none; width: 18px; height: 18px; border-radius: 50%;
+    border: 1.5px solid currentColor; display: grid; place-items: center;
+    font: 600 11px/1 var(--body);
+  }
+  .hint .full { transition: opacity .25s .2s; }
+  .hint.mini {
+    cursor: help; max-width: 34px; max-height: 34px; padding: 7px; border-radius: 999px;
+    transition-delay: .15s;
+  }
+  .hint.mini .full { opacity: 0; transition: opacity .15s; }
+  .hint.mini:hover, .hint.mini:focus {
+    max-width: 720px; max-height: 90px; padding: 6px 10px; border-radius: 8px; transition-delay: 0s;
+  }
+  .hint.mini:hover .full, .hint.mini:focus .full { opacity: 1; transition: opacity .25s .2s; }
+  @media (prefers-reduced-motion: reduce) { .hint, .hint .full { transition: none !important; } }
   .tip {
     position: fixed;
     pointer-events: none;
@@ -182,6 +254,7 @@
     border-radius: 5px;
     padding: 3px 5px;
     white-space: nowrap;
+    opacity: 0;                 /* hidden until the first frame places it */
     transition: opacity .2s;
   }
   .tag3d.person { border-color: var(--mat); color: var(--mat); }
@@ -201,6 +274,9 @@
     .tag { display: none; }
     .scroll { padding-inline: 16px; }
     .hint { display: none; }
+    .panel.collapsed { bottom: 0; }
+    .collapse svg { transform: rotate(-90deg); }
+    .panel.collapsed .collapse svg { transform: rotate(90deg); }
   }
   @media (prefers-reduced-motion: reduce) {
     .tag3d { transition: none; }
@@ -213,13 +289,22 @@
 
 <aside class="panel">
   <header>
-    <h1 class="brand">SUPER<span>CADE</span></h1>
-    <p class="tag">Flat-pack viewer. Pull the cabinet apart, check it against real people, try finishes.</p>
+    <button type="button" class="collapse" id="collapse" aria-expanded="true" aria-controls="panelBody" title="Hide the panel">
+      <svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M9 2 4 7l5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <h1 class="brand"><button type="button" id="brandBtn" title="Hide or show the panel">SUPER<span>CADE</span></button></h1>
+    <a class="by" href="https://www.sprlbs.com" target="_blank" rel="noopener">by Super Labs Inc.</a>
+    <p class="tag">Pick a size and a material, pull it apart, check it against real people, then download the plans and cut files. <a href="https://www.sprlbs.com/lab/supercade">About Supercade</a></p>
   </header>
-  <div class="scroll">
+  <div class="scroll" id="panelBody">
     <section class="group">
       <div class="label">Size</div>
       <div class="seg" id="size"></div>
+      <div class="row" id="tableRow" hidden>
+        <label for="tableH" class="label" style="margin:0">Table</label>
+        <input type="range" id="tableH" min="16" max="36" step="1" value="28">
+        <output id="tableOut" class="label" style="margin:0; min-width: 44px; text-align: right"></output>
+      </div>
     </section>
 
     <section class="group">
@@ -233,6 +318,7 @@
         <label for="spread" class="label" style="margin:0">Spread</label>
         <input type="range" id="spread" min="0" max="1" step="0.01" value="0.6">
       </div>
+      <label class="toggle"><input type="checkbox" id="xray"> X-ray: hovered part turns see-through</label>
     </section>
 
     <section class="group">
@@ -246,6 +332,20 @@
       <div class="chips" id="finish"></div>
       <div class="swatches" id="paint"></div>
       <label class="toggle"><input type="checkbox" id="art" checked> Side art stripes</label>
+    </section>
+
+    <section class="group" id="build">
+      <div class="label">Build it</div>
+      <p class="make-head" id="makeHead"></p>
+      <ul class="files" id="files"></ul>
+      <details class="make">
+        <summary>Cut list <small id="cutCount"></small></summary>
+        <ul class="parts" id="cutList"></ul>
+      </details>
+      <details class="make">
+        <summary>Shopping list</summary>
+        <div id="buyList"></div>
+      </details>
     </section>
 
     <section class="group">
@@ -263,7 +363,7 @@
     </section>
   </div>
 </aside>
-<div class="hint">Drag to orbit · scroll to zoom · right-drag to pan</div>
+<div class="hint" id="hint" tabindex="0" aria-label="Controls"><span class="q" aria-hidden="true">?</span><span class="full">Drag to orbit · scroll to zoom · right-drag to pan · WASD to move · Q/E up/down · arrows to turn · 1/2/3 size · R to reset</span></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
@@ -283,8 +383,10 @@
     { id: "kid8", name: "Kid, 8", cm: 128, head: 0.078 },
     { id: "kid5", name: "Kid, 5", cm: 110, head: 0.088 },
   ];
+  // Cardboard is only for the bartop; the full-size cabinets are plastic or wood.
   const FINISHES = [
-    { id: "cardboard", name: "Cardboard" },
+    { id: "cardboard", name: "Cardboard", only: "table" },
+    { id: "plastic", name: "Plastic" },
     { id: "birch", name: "Birch ply" },
     { id: "walnut", name: "Walnut" },
     { id: "paint", name: "Painted" },
@@ -294,9 +396,9 @@
     ["Midnight", "#1d1d33"], ["Mint", "#39c28b"], ["Bubblegum", "#ff6fb5"], ["Chalk", "#efefe9"],
   ];
   const state = {
-    build: "half", view: "assembled", spread: 0.6,
+    build: "bartop", view: "assembled", spread: 0.6, table: 28,
     people: { adult: true, kid8: true, kid5: false },
-    finish: "cardboard", paint: "#d7263d", art: true, units: "in",
+    finish: "cardboard", paint: "#d7263d", art: true, units: "in", xray: false,
   };
   try {
     const saved = JSON.parse(localStorage.getItem("supercade-viewer") || "{}");
@@ -306,6 +408,8 @@
     try { localStorage.setItem("supercade-viewer", JSON.stringify(state)); } catch (e) { /* ignore */ }
   }
   const build = () => DATA.builds.find(b => b.id === state.build) || DATA.builds[0];
+  const finishes = b => FINISHES.filter(f => f.only !== "table" || b.table);
+  const tableH = b => b.table ? state.table : 0;           // inches
 
   // ------------------------------------------------------------------ units
   function frac(v) {
@@ -439,6 +543,28 @@
   floor.receiveShadow = true;
   scene.add(floor);
 
+  // a plain table for the bartop to stand on (hidden for the floor-standing cabinets)
+  const table = new THREE.Group();
+  scene.add(table);
+  const tableMat = new THREE.MeshStandardMaterial({ map: TEX.walnut, roughness: 0.6 });
+  function buildTable(b, sz) {
+    table.clear();
+    if (!b.table) return;
+    const H = tableH(b) * IN, top = 1.2 * IN;
+    const w = Math.max(30 * IN, sz.x + 14 * IN), d = Math.max(24 * IN, sz.z + 10 * IN);
+    const zFront = sz.z + 4 * IN;                         // cabinet sits 4" back from the front edge
+    const slab = new THREE.Mesh(new THREE.BoxGeometry(w, top, d), tableMat);
+    slab.position.set(0, H - top / 2, zFront - d / 2);
+    table.add(slab);
+    const lw = 1.8 * IN;
+    for (const sx of [-1, 1]) for (const sz2 of [0, 1]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(lw, H - top, lw), tableMat);
+      leg.position.set(sx * (w / 2 - lw), (H - top) / 2, zFront - lw - sz2 * (d - 2 * lw));
+      table.add(leg);
+    }
+    table.traverse(m => { if (m.isMesh) { m.castShadow = true; m.receiveShadow = true; } });
+  }
+
   // ------------------------------------------------------------------ screen (attract mode)
   const screenCanvas = document.createElement("canvas");
   screenCanvas.width = 320; screenCanvas.height = 180;
@@ -469,6 +595,7 @@
   // ------------------------------------------------------------------ materials
   function thickness(b) {
     if (state.finish === "cardboard") return 0.28;       // double-wall board
+    if (state.finish === "plastic") return b.scale >= 1 ? 0.4 : 0.24;   // 10 mm / 6 mm PVC foam board
     return b.scale >= 1 ? 0.5 : 0.25;                    // 1/2″ ply, 1/4″ at half scale
   }
   function makeMaterials(b) {
@@ -481,6 +608,9 @@
     } else if (f === "birch") {
       face = std({ map: TEX.birch, roughness: 0.7 });
       edge = std({ color: "#e2c795", roughness: 0.8 });
+    } else if (f === "plastic") {
+      face = std({ color: "#ecece6", roughness: 0.4 });
+      edge = std({ color: "#d9d9d2", roughness: 0.5 });
     } else if (f === "walnut") {
       face = std({ map: TEX.walnut, roughness: 0.55 });
       edge = std({ color: "#4a2e19", roughness: 0.7 });
@@ -493,7 +623,7 @@
   }
   function sideArtTexture(b, dMax, hMax, mirror) {
     // Painted side with racing stripes that follow the cabinet's own slope.
-    const base = state.finish === "paint" ? state.paint : null;
+    const base = state.finish === "paint" ? state.paint : state.finish === "plastic" ? "#ecece6" : null;
     return canvasTex(512, 1024, (g, w, h) => {
       const sx = w / dMax, sy = h / hMax;
       const P = k => [b.side[k][1] * sx, h - b.side[k][0] * sy];
@@ -504,7 +634,9 @@
       }
       const light = base && new THREE.Color(base).getHSL({}).l > 0.6;
       const cols = light ? ["#1d1d33", "#d7263d", "#2346c8"] : ["#ffffff", "#ffd23f", "#ff3b6b"];
-      const [Gx, Gy] = P("G"), [Hx, Hy] = P("H");
+      // the floor-level slope at the front: the kick panel, or the bartop's front base
+      const kick = b.order.includes("H") ? ["G", "H"] : ["F", "G"];
+      const [Gx, Gy] = P(kick[0]), [Hx, Hy] = P(kick[1]);
       // three stripes parallel to the kick slope, from the floor up the back
       for (let i = 0; i < 3; i++) {
         const off = (i * 0.045 + 0.05) * h;
@@ -591,7 +723,27 @@
     // --- P2-P9 outer panels and the P4a-c screen recess behind the front frame
     const frames = {};
     const recessMat = new THREE.MeshStandardMaterial({ color: "#141417", roughness: 0.92 });
-    for (const p of b.panels) {
+    // The recess ceiling and floor are drawn to the frame's outer face; stop them
+    // at its inner face instead so they don't poke through the frame.
+    function behindFrame(p) {
+      const F = b.panels.find(q => q.id === "P4");
+      if (!p.recess || p.id === "P4b" || !F) return p;
+      const [fh, fd] = F.a, [gh, gd] = F.b, fl = Math.hypot(gh - fh, gd - fd);
+      const on = [-(gd - fd) / fl, (gh - fh) / fl];            // a frame normal (h, d)
+      const n = on[0] * F.out[0] + on[1] * F.out[1] > 0 ? on : [-on[0], -on[1]];
+      const inner = [fh - n[0] * t, fd - n[1] * t];            // a point on the frame's inner face
+      const [ah, ad] = p.a, [bh, bd] = p.b, L = Math.hypot(bh - ah, bd - ad);
+      const u = [(bh - ah) / L, (bd - ad) / L];
+      const into = u[0] * n[0] + u[1] * n[1];                  // how fast the panel runs into the frame
+      if (into <= 0) return p;
+      const depth = c => (c[0] - inner[0]) * n[0] + (c[1] - inner[1]) * n[1];
+      const back = [bh - p.out[0] * t, bd - p.out[1] * t];    // the panel's hidden corner at that end
+      const cut = Math.max(depth(p.b), depth(back)) / into;
+      if (cut <= 0) return p;
+      return Object.assign({}, p, { b: [bh - u[0] * cut, bd - u[1] * cut] });
+    }
+    for (const p0 of b.panels) {
+      const p = behindFrame(p0);
       const fr = panelFrame(p);
       frames[p.id] = fr;
       const Wm = W * IN, Lm = fr.L * IN;
@@ -614,11 +766,22 @@
       const mats = p.recess ? [recessMat.clone(), recessMat.clone()] : [face.clone(), edge.clone()];
       const mesh = new THREE.Mesh(geo, mats);
       const dir = p.explode ? new THREE.Vector3(0, p.explode[0], p.explode[1]).normalize() : fr.outW.clone();
+      const home = { pos: fr.mid.clone().addScaledVector(fr.nIn, t / 2 * IN), q: fr.q };
       addPart(parts, {
-        id: p.id, name: p.name, size: [fr.L, W, t], mesh, out: fr.out,
-        home: { pos: fr.mid.clone().addScaledVector(fr.nIn, t / 2 * IN), q: fr.q },
-        dir, dist: p.recess ? 0.55 : p.id === "P9" ? 1.6 : p.id === "P4" ? 1.3 : 1,
+        id: p.id, name: p.name, size: [fr.L, W, t], mesh, out: fr.out, home,
+        // a panel facing straight down only drops part way, or it would go through the mat
+        dir, dist: p.recess ? 0.6 : p.floor ? (b.table ? 0.45 : 2.2) : p.id === "P4" ? 1.35 : dir.y < -0.8 ? 0.4 : 1,
       });
+      // doors and hatches: the cut-out pieces, sitting in their openings
+      for (const d of p.doors || []) {
+        const [x0, s0, x1, s1] = d.rect;
+        const dm = new THREE.Mesh(new THREE.BoxGeometry((x1 - x0) * IN, (s1 - s0) * IN, t * IN), [edge.clone(), edge.clone(), edge.clone(), edge.clone(), face.clone(), face.clone()]);
+        const local = new THREE.Vector3(((x0 + x1) / 2 - W / 2) * IN, ((s0 + s1) / 2 - fr.L / 2) * IN, 0).applyQuaternion(fr.q);
+        addPart(parts, {
+          id: d.id, name: d.name, size: [s1 - s0, x1 - x0, t], mesh: dm, out: fr.out,
+          home: { pos: home.pos.clone().add(local), q: fr.q }, dir: fr.outW.clone(), dist: 1.5,
+        });
+      }
     }
 
     // --- P12 control plate on top of the deck, with the real control layout
@@ -663,12 +826,14 @@
         id: "P12", name: b.scale < 1 ? "Control plate (5 mm Foamex)" : "Control plate",
         size: [deck.L, W, pt], mesh: plate, out: deck.out,
         home: { pos: deck.mid.clone().addScaledVector(deck.nIn, -pt / 2 * IN), q: deck.q },
-        dir: deck.nIn.clone().negate(), dist: 1.7,
+        dir: deck.nIn.clone().negate(), dist: 1.4,
       });
     }
 
-    // --- Monitor behind the P4b screen board's window
-    const bez = frames.P4b;
+    // --- Monitor behind the screen board's window (P4b in the recess, or the bartop's flat P4)
+    const scr = b.panels.find(p => p.screen);
+    const bez = frames[scr.id];
+    const screenOff = scr.screenAt != null ? scr.screenAt - bez.L / 2 : 0;   // window centre along the board
     let monitorBottom = 0;
     {
       const [sw, shh] = b.screen;
@@ -682,7 +847,7 @@
       if (bez.out < 0) glass.rotation.y = Math.PI;
       if (bez.v.y < 0) glass.rotation.z = Math.PI;
       mon.add(body, glass);
-      const local = new THREE.Vector3(0, 0, -bez.out * (t / 2 + depth / 2 + 0.05) * IN);
+      const local = new THREE.Vector3(0, screenOff * IN, -bez.out * (t / 2 + depth / 2 + 0.05) * IN);
       const pos = local.clone().applyQuaternion(bez.q).add(bez.mid.clone().addScaledVector(bez.nIn, t / 2 * IN));
       addPart(parts, {
         id: "—", name: b.scale < 1 ? "13.3″ portable monitor" : "27″ monitor",
@@ -697,27 +862,51 @@
 
     // --- P10/P11 box-beam shelves
     const [bt, bs] = b.beam;
-    function beam(id, name, topH, dFront) {
-      const geo = new THREE.BoxGeometry(W * IN, bs * IN, bt * IN);
+    function beam(id, name, topH, dFront, depth, thick) {
+      const geo = new THREE.BoxGeometry(W * IN, thick * IN, depth * IN);
       const mesh = new THREE.Mesh(geo, [edge.clone(), edge.clone(), face.clone(), face.clone(), edge.clone(), edge.clone()]);
       addPart(parts, {
-        id, name, size: [bt, W, bs], mesh, out: 1,
-        home: { pos: new THREE.Vector3(0, (topH - bs / 2) * IN, (dFront - bt / 2) * IN), q: new THREE.Quaternion() },
-        dir: new THREE.Vector3(0, 0, 1), dist: 0.8, flatUp: true,
+        id, name, size: [depth, W, thick], mesh, out: 1,
+        home: { pos: new THREE.Vector3(0, (topH - thick / 2) * IN, (dFront - depth / 2) * IN), q: new THREE.Quaternion() },
+        dir: new THREE.Vector3(0, 0, -1), dist: 0.55, flatUp: true,
       });
     }
     const S = b.side;
-    const board = b.panels.find(p => p.id === "P4b");
-    const frontAt = h => { // just behind the screen board (and the monitor on it) at height h
-      const [h1, d1] = board.a, [h2, d2] = board.b;
-      return d1 + (d2 - d1) * (h - h1) / (h2 - h1) - t - (b.scale < 1 ? 0.7 : 2.0);
-    };
-    const shelfTop = monitorBottom - 0.05;
-    beam("P10", "Screen shelf", shelfTop, Math.max(bt + t, frontAt(shelfTop - bs)));
+    if (b.ledge) {
+      // Bartop: an L-angle glued to the back of the screen board; the monitor stands on it
+      const { width, leg, at } = b.ledge, lt = t;
+      const g = new THREE.Group();
+      const back = -bez.out;                                   // local z pointing into the cabinet
+      const upright = new THREE.Mesh(new THREE.BoxGeometry(width * IN, leg * IN, lt * IN), face.clone());
+      upright.position.set(0, (at + leg / 2 - bez.L / 2) * IN, back * (t / 2 + lt / 2) * IN);
+      const shelf = new THREE.Mesh(new THREE.BoxGeometry(width * IN, lt * IN, leg * IN), face.clone());
+      shelf.position.set(0, (at + lt / 2 - bez.L / 2) * IN, back * (t / 2 + leg / 2) * IN);
+      g.add(upright, shelf);
+      addPart(parts, {
+        id: "P10", name: "Monitor ledge", size: [leg * 2, width, lt], mesh: g, out: bez.out,
+        home: { pos: bez.mid.clone().addScaledVector(bez.nIn, t / 2 * IN), q: bez.q },
+        dir: bez.outW.clone(), dist: 0.5,
+      });
+    } else {
+      const board = scr;
+      const frontAt = h => { // back face of the screen board at height h
+        const [h1, d1] = board.a, [h2, d2] = board.b;
+        return d1 + (d2 - d1) * (h - h1) / (h2 - h1) - t - 0.05;
+      };
+      // The screen shelf spans from the back panel to the back of the screen board
+      // (the board leans back, so the top edge is the tight one); the monitor sits on it.
+      const shelfTop = monitorBottom - 0.05;
+      const shelfFront = frontAt(shelfTop);
+      const [sbt, sbs] = b.screenBeam || [bt, bs];            // the monitor's shelf is a slimmer tube
+      beam("P10", "Screen shelf", shelfTop, shelfFront, Math.min(sbt, shelfFront - t - 0.05), sbs);
+    }
     const kickAt = h => S.H[1] + (S.G[1] - S.H[1]) * h / S.G[0] - t - 0.3;
-    if (b.shelfH > bs + 0.5) beam("P11", "Lower shelf", b.shelfH, Math.min(kickAt(b.shelfH - bs), 2 * b.scale + bt));
+    if (b.shelfH > bs + 0.5) beam("P11", "Lower shelf", b.shelfH, Math.min(kickAt(b.shelfH - bs), 2 * b.scale + bt), bt, bs);
 
-    for (const p of parts) group.add(p.mesh);
+    for (const p of parts) {
+      p.radius = new THREE.Box3().setFromObject(p.mesh).getBoundingSphere(new THREE.Sphere()).radius;
+      group.add(p.mesh);
+    }
 
     // --- flat-pack layout: every part lying outer-face-up on the mat
     const q90 = new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2, 0, 0));
@@ -778,7 +967,31 @@
         done();
       }, () => done());
     }));
-    Promise.all(jobs).then(() => { if (cabinet) placePeople(); });
+    Promise.all(jobs).then(() => {
+      // The stylized male body reads as a cartoon at 8; a child-proportioned
+      // copy of the realistic adult matches the others better.
+      if (bodyGeo.adult) bodyGeo.kid8 = childFrom(bodyGeo.adult, 1.22, 0.93);
+      if (cabinet) placePeople();
+    });
+  }
+  // Grow the head (everything above the neck) about the neck, and slim the body a
+  // little; the viewer then scales the whole figure down to the child's height.
+  function childFrom(adult, headK, slim) {
+    const g = adult.clone(), pos = g.attributes.position, bb = adult.boundingBox;
+    const Hb = bb.max.y - bb.min.y, neck = bb.min.y + Hb * 0.855, blend = Hb * 0.03;
+    let nz = 0, n = 0;                                   // neck centre, front to back
+    for (let i = 0; i < pos.count; i++) if (Math.abs(pos.getY(i) - neck) < blend) { nz += pos.getZ(i); n++; }
+    nz = n ? nz / n : 0;
+    for (let i = 0; i < pos.count; i++) {
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+      const t = Math.min(1, Math.max(0, (y - (neck - blend)) / blend));
+      const f = t * t * (3 - 2 * t);                      // 0 on the body, 1 on the head
+      const k = 1 + (headK - 1) * f, w = slim + (1 - slim) * f;
+      pos.setXYZ(i, x * k * w, neck + (y - neck) * k, nz + (z - nz) * k * w);
+    }
+    g.computeVertexNormals();
+    g.computeBoundingBox();
+    return g;
   }
   const skin = new THREE.MeshStandardMaterial({ color: "#b9c3be", roughness: 0.62, metalness: 0 });
 
@@ -826,8 +1039,10 @@
       scene.remove(cabinet.group);
       cabinet.group.traverse(o => { if (o.geometry) o.geometry.dispose(); });
     }
+    if (!finishes(build()).some(f => f.id === state.finish)) state.finish = "birch";
     cabinet = buildCabinet();
     scene.add(cabinet.group);
+    buildTable(cabinet.b, cabinet.size);
 
     labelsEl.textContent = "";
     labelEls = cabinet.parts.filter(p => !p.noList).map(p => {
@@ -865,19 +1080,45 @@
 
   // ------------------------------------------------------------------ camera
   let camTween = null;
+  // On a table, exploding lifts the cabinet a little so its base can drop clear of the table top
+  const reachOf = b => 0.5 + 0.55 * b.scale;                 // far enough that no two parts touch
+  const tableLift = e => cabinet.b.table ? e * reachOf(cabinet.b) * 0.5 : 0;
+  // Fit the camera to where everything will END UP for this view: the parts at
+  // their exploded or flat-pack spots, the table, and anyone standing beside it.
+  const _box = new THREE.Box3(), _v = new THREE.Vector3(), _s = new THREE.Sphere();
   function camGoal() {
-    const s = cabinet.size;
-    const narrow = Math.max(1, Math.pow(1 / Math.max(camera.aspect, 0.3), 0.8));   // portrait phones need more distance
-    const tallest = Math.max(0, ...PEOPLE.filter(p => state.people[p.id]).map(p => p.cm / 100));
-    const H = Math.max(s.y, tallest, 1.0);
-    if (state.view === "flat") {
-      const e = Math.max(cabinet.flatExtent.x, cabinet.flatExtent.y) + 1;
-      return { target: new THREE.Vector3(-0.2, 0, 0), pos: new THREE.Vector3(e * 0.35, e * 1.05, e * 0.95).multiplyScalar(narrow) };
+    const flatView = state.view === "flat";
+    const e = state.view === "exploded" ? state.spread : 0;
+    const reach = reachOf(cabinet.b);
+    const lift = flatView ? 0 : tableH(cabinet.b) * IN + tableLift(e);
+    _box.makeEmpty();
+    for (const p of cabinet.parts) {
+      if (flatView) _v.copy(p.flat.pos);
+      else _v.copy(p.home.pos).addScaledVector(p.dir, e * reach * p.dist);
+      _v.y += lift;
+      const r = p.radius * 0.8;
+      _box.expandByPoint(_v.clone().addScalar(r)).expandByPoint(_v.clone().addScalar(-r));
     }
-    const n = PEOPLE.filter(p => state.people[p.id]).length;
-    const target = new THREE.Vector3(-n * 0.22, H * 0.45, s.z * 0.45);
-    const k = (state.view === "exploded" ? 1.3 + state.spread * 0.4 : 1.05) * (1 + n * 0.08) * narrow;
-    return { target, pos: target.clone().add(new THREE.Vector3(H * 1.2 * k, H * 0.35 * k + 0.15, H * 1.9 * k)) };
+    // people are for scale in the built view; exploded / flat-pack frame the parts
+    if (state.view === "assembled") for (const fig of peopleGroup.children) {
+      const at = flatView ? fig.userData.flat : fig.userData.home, r = fig.userData.H * 0.22;
+      _box.expandByPoint(new THREE.Vector3(at.x - r, 0, at.z - r)).expandByPoint(new THREE.Vector3(at.x + r, fig.userData.H, at.z + r));
+    }
+    if (!flatView && table.children.length) {
+      // the table top is enough context; its legs would pull the camera down
+      const tb = new THREE.Box3().setFromObject(table);
+      if (state.view === "exploded") tb.min.y = tb.max.y - 0.05;
+      _box.union(tb);
+    }
+    _box.getBoundingSphere(_s);
+    // far enough that the sphere fits the visible part of the view, both ways
+    const vfov = THREE.MathUtils.degToRad(camera.fov);
+    const hfov = 2 * Math.atan(Math.tan(vfov / 2) * viewAspect);
+    // a bounding sphere is roomier than the parts themselves, so come in a little
+    const dist = _s.radius / Math.sin(Math.min(vfov, hfov) / 2) * (state.view === "assembled" ? 0.92 : 0.8);
+    const dir = flatView ? new THREE.Vector3(0.35, 1.05, 0.95) : new THREE.Vector3(1.2, 0.42, 1.9);
+    const target = _s.center.clone();
+    return { target, pos: target.clone().addScaledVector(dir.normalize(), dist) };
   }
   function frameCamera(instant) {
     const g = camGoal();
@@ -887,6 +1128,57 @@
     camTween = { t: 0, fromT: controls.target.clone(), fromP: camera.position.clone(), to: g };
   }
   controls.addEventListener("start", () => { camTween = null; });
+  // open hand over the scene, closed hand while dragging it
+  renderer.domElement.addEventListener("pointerdown", () => renderer.domElement.classList.add("dragging"));
+  window.addEventListener("pointerup", () => renderer.domElement.classList.remove("dragging"));
+  window.addEventListener("pointercancel", () => renderer.domElement.classList.remove("dragging"));
+
+  // WASD walks the camera across the floor (target and all), Q/E raise and lower it,
+  // arrows orbit, R reframes it
+  const keys = new Set();
+  const typing = e => /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== "checkbox" && e.target.type !== "range";
+  window.addEventListener("keydown", e => {
+    if (e.metaKey || e.ctrlKey || e.altKey || typing(e)) return;
+    const k = e.key.toLowerCase();
+    if (("wasdqe".includes(k) && k.length === 1) || k.startsWith("arrow")) { keys.add(k); camTween = null; e.preventDefault(); }
+    else if (k === "r") { frameCamera(false); e.preventDefault(); }
+    else if (/^[1-9]$/.test(k) && DATA.builds[+k - 1]) {
+      // 1 / 2 / 3 pick a size, in the order the Size buttons show them
+      state.build = DATA.builds[+k - 1].id; save(); rebuild(false); e.preventDefault();
+    }
+  });
+  window.addEventListener("keyup", e => keys.delete(e.key.toLowerCase()));
+  window.addEventListener("blur", () => keys.clear());
+  const fwd = new THREE.Vector3(), right = new THREE.Vector3(), move = new THREE.Vector3();
+  const orbit = new THREE.Spherical(), offset = new THREE.Vector3();
+  function walk(dt) {
+    if (!keys.size) return;
+    // arrow keys orbit around the target, like dragging
+    const turn = (keys.has("arrowleft") ? 1 : 0) - (keys.has("arrowright") ? 1 : 0);
+    const tilt = (keys.has("arrowup") ? 1 : 0) - (keys.has("arrowdown") ? 1 : 0);
+    if (turn || tilt) {
+      offset.copy(camera.position).sub(controls.target);
+      orbit.setFromVector3(offset);
+      orbit.theta += turn * dt * 1.4;
+      orbit.phi = Math.min(controls.maxPolarAngle, Math.max(0.05, orbit.phi - tilt * dt * 1.0));
+      camera.position.copy(controls.target).add(offset.setFromSpherical(orbit));
+    }
+    camera.getWorldDirection(fwd); fwd.y = 0; fwd.normalize();
+    right.crossVectors(fwd, camera.up).normalize();
+    move.set(0, 0, 0);
+    if (keys.has("w")) move.add(fwd);
+    if (keys.has("s")) move.sub(fwd);
+    if (keys.has("d")) move.add(right);
+    if (keys.has("a")) move.sub(right);
+    if (keys.has("q")) move.y += 1;
+    if (keys.has("e")) move.y -= 1;
+    if (!move.lengthSq()) return;
+    // faster when zoomed out, so it feels the same at any distance
+    move.normalize().multiplyScalar(dt * Math.max(0.6, camera.position.distanceTo(controls.target) * 0.6));
+    // keep the view above the floor
+    move.y = Math.max(move.y, 0.02 - Math.min(camera.position.y, controls.target.y));
+    camera.position.add(move); controls.target.add(move);
+  }
 
   // ------------------------------------------------------------------ animation
   let explode = 0, flat = 0;
@@ -901,7 +1193,10 @@
     if (Math.abs(wantE - explode) < 1e-4) explode = wantE;
     if (Math.abs(wantF - flat) < 1e-4) flat = wantF;
     const f = ease(flat);
-    const reach = 0.28 + 0.3 * cabinet.b.scale;
+    const onTable = tableH(cabinet.b) * IN;
+    cabinet.group.position.y = (onTable + tableLift(explode)) * (1 - f);
+    table.visible = f < 0.02;
+    const reach = reachOf(cabinet.b);
     for (const p of cabinet.parts) {
       tmpV.copy(p.home.pos).addScaledVector(p.dir, explode * reach * p.dist);
       p.mesh.position.lerpVectors(tmpV, p.flat.pos, f);
@@ -910,6 +1205,8 @@
         : p.mesh.quaternion.copy(p.home.q).slerp(p.flat.q, f);
     }
     for (const fig of peopleGroup.children) fig.position.lerpVectors(fig.userData.home, fig.userData.flat, f);
+    // people are for scale next to the built cabinet; they step out for the other views
+    peopleGroup.visible = state.view === "assembled" && explode < 0.02 && flat < 0.02;
 
     if (camTween) {
       camTween.t = Math.min(1, camTween.t + dt / 0.9);
@@ -936,7 +1233,7 @@
       proj.set(fig.position.x, fig.userData.H + 0.12, fig.position.z).project(camera);
       el.style.left = ((proj.x + 1) / 2 * w) + "px";
       el.style.top = ((1 - proj.y) / 2 * h) + "px";
-      el.style.opacity = proj.z < 1 ? 1 : 0;
+      el.style.opacity = peopleGroup.visible && proj.z < 1 ? 1 : 0;
     }
   }
 
@@ -948,7 +1245,14 @@
     if (hot === p) return;
     const glow = (part, on) => part && part.mesh.traverse(m => {
       if (!m.isMesh) return;
-      (Array.isArray(m.material) ? m.material : [m.material]).forEach(mt => mt.emissive && mt.emissive.setHex(on ? 0x6a4a00 : 0x000000));
+      const see = on && state.xray;
+      (Array.isArray(m.material) ? m.material : [m.material]).forEach(mt => {
+        if (mt.emissive) mt.emissive.setHex(on ? 0x6a4a00 : 0x000000);
+        // x-ray: the hovered part goes see-through so you can look inside
+        if (mt.transparent !== see) { mt.transparent = see; mt.needsUpdate = true; }
+        mt.opacity = see ? 0.28 : 1;
+        mt.depthWrite = !see;
+      });
     });
     glow(hot, false); hot = p; glow(hot, true);
     document.querySelectorAll("#parts li").forEach(li => li.classList.toggle("hot", !!p && li.dataset.key === p.key));
@@ -1003,7 +1307,7 @@
     }
 
     // controls vs elbow height: a comfortable deck sits at or a little under the elbow
-    const deckH = (b.side.D[0] + b.side.E[0]) / 2;
+    const deckH = (b.side.D[0] + b.side.E[0]) / 2 + tableH(b);    // from the floor, table included
     const fitEl = document.getElementById("fit");
     fitEl.textContent = "";
     for (const p of PEOPLE.filter(p => state.people[p.id])) {
@@ -1018,7 +1322,7 @@
 
     const fin = document.getElementById("finish");
     fin.textContent = "";
-    for (const f of FINISHES) {
+    for (const f of finishes(b)) {
       const c = document.createElement("button");
       c.type = "button"; c.className = "chip"; c.textContent = f.name;
       c.setAttribute("aria-pressed", String(state.finish === f.id));
@@ -1044,7 +1348,33 @@
       ["Outside width", fmt(b.innerWidth + 2 * t)], ["Control deck", fmt(deckH)],
       ["Screen", b.scale < 1 ? "13.3″" : "27″"], ["Board", fmt(t)],
     ];
+    if (b.table) rows.push(["On a table", fmt(tableH(b))], ["Deck above table", fmt(deckH - tableH(b))]);
     dims.innerHTML = rows.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join("");
+    const tr = document.getElementById("tableRow");
+    tr.hidden = !b.table;
+    document.getElementById("tableH").value = state.table;
+    document.getElementById("tableOut").textContent = fmt(state.table);
+
+    // --- how to build it, in the material the finish implies
+    const mat = state.finish === "cardboard" ? "cardboard" : state.finish === "plastic" ? "plastic" : "wood";
+    const mk = (b.make || {})[mat];
+    const buildEl = document.getElementById("build");
+    buildEl.hidden = !mk;
+    if (mk) {
+      const esc = t => String(t).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+      document.getElementById("makeHead").innerHTML =
+        `<b>${esc(mk.name)}</b>` + (mat === "cardboard" ? "" : ` · ${mk.sheets} × ${esc(mk.sheet)}`) + `<br>${esc(mk.note)}`;
+      document.getElementById("files").innerHTML = mk.files.map(f => {
+        const ext = f.href.split(".").pop().toUpperCase();
+        return `<li><a href="${esc(f.href)}" target="_blank" rel="noopener"${ext === "PDF" ? "" : " download"}>${esc(f.label.replace(/ \((PDF|DXF|SVG)\)$/, ""))}<small>${ext}</small></a></li>`;
+      }).join("");
+      const qtyTotal = mk.cut.reduce((a, r) => a + r.qty, 0);
+      document.getElementById("cutCount").textContent = `${qtyTotal} pieces`;
+      document.getElementById("cutList").innerHTML = mk.cut.map(r =>
+        `<li title="${esc(r.note)}"><b>${esc(r.id)}</b><span>${esc(r.name)}${r.qty > 1 ? ` <span class="qty">×${r.qty}</span>` : ""}</span><span class="sz">${esc(r.size)}</span></li>`).join("");
+      document.getElementById("buyList").innerHTML = mk.buy.map(g =>
+        `<div class="buy"><h4>${esc(g.group)}</h4>` + g.items.map(i => `<p>${esc(i.name)}${i.note ? `<span>${esc(i.note)}</span>` : ""}</p>`).join("") + `</div>`).join("");
+    }
 
     const list = document.getElementById("parts");
     list.textContent = "";
@@ -1067,30 +1397,71 @@
   document.querySelectorAll("#units button").forEach(bt => bt.addEventListener("click", () => {
     state.units = bt.dataset.u; save(); placePeople(); renderPanel();
   }));
+  document.getElementById("tableH").addEventListener("input", e => {
+    state.table = +e.target.value; save();
+    buildTable(cabinet.b, cabinet.size); renderPanel(); frameCamera(false);
+  });
   const spread = document.getElementById("spread");
   spread.value = state.spread;
   spread.addEventListener("input", () => {
     state.spread = +spread.value; save();
-    if (state.view === "assembled") { state.view = "exploded"; syncPressed(); frameCamera(false); }
+    if (state.view === "assembled") { state.view = "exploded"; syncPressed(); }
+    frameCamera(false);                       // keep every part in view as it spreads
   });
   document.getElementById("art").addEventListener("change", e => { state.art = e.target.checked; save(); rebuild(true); });
+  const xray = document.getElementById("xray");
+  xray.checked = state.xray;
+  xray.addEventListener("change", () => { state.xray = xray.checked; save(); const h = hot; setHot(null); setHot(h); });
 
   // ------------------------------------------------------------------ loop
+  // The panel covers part of the window, so centre the model in what's left:
+  // to the right of it on desktop, above it on phones. Collapsing it gives the
+  // model the whole window back.
+  const panelEl = document.querySelector(".panel");
+  let viewAspect = 1;
   function resize() {
     const w = stage.clientWidth, h = stage.clientHeight;
     renderer.setSize(w, h, false);
     camera.aspect = w / h;
-    // on phones the panel covers the bottom: nudge the view up
-    camera.setViewOffset(w, h, 0, w < 720 ? h * 0.18 : 0, w, h);
+    const r = panelEl.getBoundingClientRect();
+    const collapsed = panelEl.classList.contains("collapsed");
+    let ox = 0, oy = 0, vw = w, vh = h;
+    if (w >= 720) {
+      if (!collapsed) { vw = w - r.right; ox = -r.right / 2; }
+    } else {
+      const covered = Math.max(0, h - r.top);
+      vh = h - covered; oy = covered / 2;
+    }
+    viewAspect = vw / vh;
+    camera.setViewOffset(w, h, ox, oy, w, h);
     camera.updateProjectionMatrix();
   }
   window.addEventListener("resize", resize);
+  const collapseBtn = document.getElementById("collapse");
+  function setCollapsed(on) {
+    panelEl.classList.toggle("collapsed", on);
+    collapseBtn.setAttribute("aria-expanded", String(!on));
+    collapseBtn.title = on ? "Show the panel" : "Hide the panel";
+    state.collapsed = on; save();
+    resize();
+    if (cabinet) frameCamera(false);
+  }
+  collapseBtn.addEventListener("click", () => setCollapsed(!state.collapsed));
+  document.getElementById("brandBtn").addEventListener("click", () => setCollapsed(!state.collapsed));
+  // once someone starts moving the view, the controls hint shrinks to a pill
+  const hintEl = document.getElementById("hint");
+  const shrinkHint = () => hintEl.classList.add("mini");
+  renderer.domElement.addEventListener("pointerdown", shrinkHint, { once: true });
+  renderer.domElement.addEventListener("wheel", shrinkHint, { once: true, passive: true });
+  window.addEventListener("keydown", e => { if (keys.size || e.key.toLowerCase() === "r") shrinkHint(); });
+  if (state.collapsed) { panelEl.classList.add("collapsed"); collapseBtn.setAttribute("aria-expanded", "false"); collapseBtn.title = "Show the panel"; }
 
   let last = performance.now(), lastScreen = 0;
   function frame(now) {
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     step(dt);
+    walk(dt);
     controls.update();
     if (now - lastScreen > 80) { drawScreen(now); lastScreen = now; }
     placeLabels();
